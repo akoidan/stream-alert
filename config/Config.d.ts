@@ -2,14 +2,16 @@
 /* eslint-disable */
 declare module "node-config-ts" {
   interface IConfig {
-    pushcut: Pushcut
+    telegram: Telegram
     camera: string
+    frameRate: number
     diffThreshold: number
     threshold: number
   }
-  interface Pushcut {
+  interface Telegram {
     token: string
-    notificationName: string
+    chatId: number
+    spamDelay: number
   }
   export const config: Config
   export type Config = IConfig

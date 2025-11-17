@@ -3,7 +3,7 @@ import {spawn} from "child_process";
 import {Jimp, JimpInstance} from "jimp";
 import pixelmatch from "pixelmatch";
 import {config} from 'node-config-ts'
-
+import { Telegraf } from 'telegraf';
 
 
 let lastFrame: JimpInstance | null = null;
@@ -11,7 +11,7 @@ let lastFrame: JimpInstance | null = null;
 const ff = spawn("ffmpeg.exe", [
   "-f", "dshow",
   "-i", `video=${config.camera}`,
-  "-r", "1",
+  "-r", `${config.frameRate}`,
   "-vcodec", "mjpeg",
   "-f", "image2pipe",
   "-"
@@ -23,19 +23,18 @@ ff.stderr.on("data", d => {
 });
 
 // Buffer accumulator because JPEG frames are variable-size
-let buffer = Buffer.alloc(0);
-
+let buffer: Buffer = Buffer.alloc(0);
+const bot = new Telegraf(config.telegram.token);
 let lastNotificationTime = Date.now();
 
+bot.on("message", async message => {
+  console.log(message);
+})
 async function sendNotification() {
   try {
     let newNotificationTime = Date.now();
-    if (newNotificationTime - lastNotificationTime > 10000) {
-      await fetch(`https://api.pushcut.io/${config.pushcut.token}/notifications/${encodeURIComponent(config.pushcut.token)}`, {
-        method: 'POST',
-      })
-      lastNotificationTime = newNotificationTime
-      console.log('Notified the phone')
+    if (newNotificationTime - lastNotificationTime > config.telegram.spamDelay) {
+      await bot.telegram.sendMessage(config.telegram.chatId, 'Core is UP!');
     } else {
       console.log('skipping notification');
     }
@@ -50,8 +49,8 @@ ff.stdout.on("data", async chunk => {
     buffer = Buffer.concat([buffer, chunk]);
 
     // Look for JPEG frame boundaries
-    const SOI = buffer.indexOf(Buffer.from([0xFF, 0xD8])); // Start of Image
-    const EOI = buffer.indexOf(Buffer.from([0xFF, 0xD9])); // End of Image
+    const SOI = buffer.indexOf(Buffer.from([0xFF, 0xD8]) as Uint8Array); // Start of Image
+    const EOI = buffer.indexOf(Buffer.from([0xFF, 0xD9]) as Uint8Array); // End of Image
 
     if (SOI === -1 || EOI === -1 || EOI < SOI) {
       return;
@@ -67,8 +66,8 @@ ff.stdout.on("data", async chunk => {
     const {width, height} = frame.bitmap;
 
     const diffPixels = pixelmatch(
-      frame.bitmap.data,
-      lastFrame.bitmap.data,
+      frame.bitmap.data as Uint8Array,
+      lastFrame.bitmap.data as Uint8Array,
       null!,
       width,
       height,

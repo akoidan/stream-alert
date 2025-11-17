@@ -1,9 +1,11 @@
 {
-  "pushcut": {
-    "token": "QztH3nk8UILMsWE74Jpm3",
-    "notificationName": "core"
+  "telegram": {
+    "token": "123:xxxxxx",
+    "chatId": 12345,
+    "spamDelay": 10000
   },
   "camera": "OBS Virtual Camera",
+  "frameRate": 1,
   "diffThreshold": 500,
   "threshold": 0.2
 }
