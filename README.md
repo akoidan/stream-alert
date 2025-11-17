@@ -32,6 +32,7 @@ For screen capture you need OBS with streaming as a camera feature
 - Install [OBS](https://obsproject.com/) or use `choco install obs`
 - Launch OBS 
 - Capture a window or screen you want to monitor and click `Start Virtual Camera`
+- Try to fit only the area you need to monitor. Use `m2` on the window reactanble->`resize output (Source size)`. m2 on dark area -> `preview scaling`
 - Check the name camera specified at `config/default.json` at path `camera` matches the camera name from `ffmpeg -list_devices true -f dshow -i dummy` command
 
 
