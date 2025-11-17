@@ -1,7 +1,9 @@
 {
   "pushcut": {
     "token": "QztH3nk8UILMsWE74Jpm3",
-    "notificationName": "My First Notification",
+    "notificationName": "core"
   },
-  "camera": "OBS Virtual Camera"
+  "camera": "OBS Virtual Camera",
+  "diffThreshold": 500,
+  "threshold": 0.2
 }

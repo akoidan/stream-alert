@@ -1,12 +1,18 @@
 {
-  "name": "${PROJECT_NAME}",
+  "name": "stream-alert",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc"
+    "start": "ts-node src",
+    "postinstall": "node-config-ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "jimp": "^1.6.0",
+    "node-config-ts": "^3.3.1",
+    "pixelmatch": "^7.1.0",
+    "ts-node": "^10.9.2"
+  },
   "devDependencies": {
     "typescript": "^5.5.3"
   },
