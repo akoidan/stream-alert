@@ -24,7 +24,7 @@ Get a telegram notification when your webcamera or screen changes
 
 ### Input  
 #### Web camera
-For web camera specify its name in `config/default.json` at path `camera`. 
+For web camera specify its name in `config/default.json` at path `camera`.  You can get the name from `ffmpeg -list_devices true -f dshow -i dummy` command
 
 #### Screen capture
 For screen capture you need OBS with streaming as a camera feature
@@ -32,7 +32,7 @@ For screen capture you need OBS with streaming as a camera feature
 - Install [OBS](https://obsproject.com/) or use `choco install obs`
 - Launch OBS 
 - Capture a window or screen you want to monitor and click `Start Virtual Camera`
-- The name of your camera should be specified at `config/default.json` at path `camera`. If you use default settings, it's already there
+- Check the name camera specified at `config/default.json` at path `camera` matches the camera name from `ffmpeg -list_devices true -f dshow -i dummy` command
 
 
 ### Clone repo

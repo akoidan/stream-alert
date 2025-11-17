@@ -19,7 +19,7 @@ const ff = spawn("ffmpeg.exe", [
 
 ff.stderr.on("data", d => {
   // Device / FFmpeg logs
-  // console.error(String(d));
+  console.error(String(d));
 });
 
 // Buffer accumulator because JPEG frames are variable-size
@@ -36,6 +36,7 @@ async function sendNotification(data: Buffer) {
     let newNotificationTime = Date.now();
     if (newNotificationTime - lastNotificationTime > config.telegram.spamDelay) {
       await bot.telegram.sendPhoto(config.telegram.chatId, {source: data}, {caption: config.telegram.message});
+      lastNotificationTime = newNotificationTime;
     } else {
       console.log('skipping notification');
     }
