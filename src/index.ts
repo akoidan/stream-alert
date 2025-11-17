@@ -3,10 +3,10 @@ import {spawn} from "child_process";
 import {Jimp, JimpInstance} from "jimp";
 import pixelmatch from "pixelmatch";
 import {config} from 'node-config-ts'
-import { Telegraf } from 'telegraf';
+import {Telegraf} from 'telegraf';
 
 
-let lastFrame: JimpInstance | null = null;
+let oldFrame: JimpInstance | null = null;
 
 const ff = spawn("ffmpeg.exe", [
   "-f", "dshow",
@@ -30,11 +30,12 @@ let lastNotificationTime = Date.now();
 bot.on("message", async message => {
   console.log(message);
 })
-async function sendNotification() {
+
+async function sendNotification(data: Buffer) {
   try {
     let newNotificationTime = Date.now();
     if (newNotificationTime - lastNotificationTime > config.telegram.spamDelay) {
-      await bot.telegram.sendMessage(config.telegram.chatId, 'Core is UP!');
+      await bot.telegram.sendPhoto(config.telegram.chatId, {source: data}, {caption: config.telegram.message});
     } else {
       console.log('skipping notification');
     }
@@ -57,27 +58,27 @@ ff.stdout.on("data", async chunk => {
     }
     const frameData = buffer.slice(SOI, EOI + 2);
     buffer = buffer.slice(EOI + 2);
-    const frame = await Jimp.read(frameData);
+    const newFrame = await Jimp.read(frameData);
 
-    if (!lastFrame) {
-      lastFrame = frame as JimpInstance;
+    if (!oldFrame) {
+      oldFrame = newFrame as JimpInstance;
       return;
     }
-    const {width, height} = frame.bitmap;
+    const {width, height} = newFrame.bitmap;
 
     const diffPixels = pixelmatch(
-      frame.bitmap.data as Uint8Array,
-      lastFrame.bitmap.data as Uint8Array,
+      newFrame.bitmap.data as Uint8Array,
+      oldFrame.bitmap.data as Uint8Array,
       null!,
       width,
       height,
       {threshold: config.threshold}
     );
-    lastFrame = frame as JimpInstance;
+    oldFrame = newFrame as JimpInstance;
 
     if (diffPixels > config.diffThreshold) {
       console.log(`⚠️ CHANGE DETECTED: ${diffPixels}`);
-      await sendNotification();
+      await sendNotification(await newFrame.getBuffer('image/jpeg'));
     } else {
       process.stdout.write(".");
     }

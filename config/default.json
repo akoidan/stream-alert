@@ -2,10 +2,11 @@
   "telegram": {
     "token": "123:xxxxxx",
     "chatId": 12345,
-    "spamDelay": 10000
+    "spamDelay": 10000,
+    "message": "Changes detected"
   },
   "camera": "OBS Virtual Camera",
   "frameRate": 1,
-  "diffThreshold": 500,
+  "diffThreshold": 1000,
   "threshold": 0.2
 }
