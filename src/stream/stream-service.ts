@@ -11,8 +11,6 @@ export class StreamService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly telegram: TelegramService,
-    private readonly imageLib: ImagelibService,
     cameraName: string,
     frameRate: number,
   ) {
@@ -26,7 +24,7 @@ export class StreamService {
     ]
   }
 
-  async listen(): Promise<void> {
+  async listen(onImage: (buffer: Buffer<ArrayBuffer>) => Promise<void>): Promise<void> {
     const ff = spawn("ffmpeg", this.ffmpegArgs);
 
     ff.stderr.on("data", d => {
@@ -36,7 +34,6 @@ export class StreamService {
       }
     });
 
-    let i = 0;
     ff.stdout.on("data", async chunk => {
       process.stdout.write(".");
       try {
@@ -51,11 +48,7 @@ export class StreamService {
         }
         const frameData = this.buffer.slice(SOI, EOI + 2);
         this.buffer = this.buffer.slice(EOI + 2);
-
-        const image = await this.imageLib.getImageIfItsChanged(frameData);
-        if (image) {
-          await this.telegram.sendMessage(image);
-        }
+        await onImage(frameData);
       } catch (err) {
         this.logger.error("Failed to parse frame", err);
       }

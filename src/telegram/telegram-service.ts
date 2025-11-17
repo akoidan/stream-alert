@@ -14,7 +14,7 @@ export class TelegramService {
   ) {
   }
 
-  async sendMessage(data: Buffer,): Promise<void> {
+  async sendMessage(data: Buffer): Promise<void> {
     const newNotificationTime = Date.now();
     if (newNotificationTime - this.lastNotificationTime > this.spamDelay) {
       await this.bot.telegram.sendPhoto(this.chatId, {source: data}, {caption: this.tgMessage});
