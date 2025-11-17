@@ -13,6 +13,13 @@ export class ImagelibService {
   ) {
   }
 
+  async getLastImage(): Promise<Buffer|null> {
+    if (this.oldFrame) {
+      return this.oldFrame.getBuffer('image/jpeg');
+    }
+    return null;
+  }
+
   async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer|null> {
     const newFrame = await Jimp.read(frameData);
 

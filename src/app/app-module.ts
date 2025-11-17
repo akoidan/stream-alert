@@ -1,7 +1,6 @@
 /// <reference path="../../config/Config.d.ts" />
 import {Logger, Module, OnModuleInit} from '@nestjs/common';
 import {TelegramService} from "@/telegram/telegram-service";
-import {config} from 'node-config-ts'
 import {StreamService} from "@/stream/stream-service";
 import {TelegramModule} from "@/telegram/telegram-module";
 import {ImagelibModule} from "@/imagelib/imagelib-module";
@@ -11,13 +10,16 @@ import {StreamModule} from "@/stream/stream-module";
 
 @Module({
   imports: [StreamModule, TelegramModule, ImagelibModule],
+  providers: [Logger]
 })
 export class AppModule implements OnModuleInit {
 
   constructor(
     private readonly ss: StreamService,
     private readonly telegram: TelegramService,
-    private readonly im: ImagelibService) {
+    private readonly im: ImagelibService,
+    private readonly logger: Logger,
+  ) {
   }
 
   async onModuleInit() {
@@ -25,6 +27,15 @@ export class AppModule implements OnModuleInit {
       const image = await this.im.getImageIfItsChanged(frameData);
       if (image) {
         await this.telegram.sendMessage(image);
+      }
+    });
+    await this.telegram.setup(async () => {
+      this.logger.log(`Got image command`);
+      const image = await this.im.getLastImage();
+      if (image) {
+        await this.telegram.sendMessage(image);
+      } else {
+        this.logger.log(`No current image found, skipping`);
       }
     });
   }
