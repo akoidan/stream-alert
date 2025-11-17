@@ -1,6 +1,5 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {Telegraf} from "telegraf";
-import {Jimp, JimpInstance} from "jimp/dist/esm";
+import {Jimp, JimpInstance} from "jimp";
 import pixelmatch from "pixelmatch";
 
 @Injectable()

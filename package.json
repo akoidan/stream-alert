@@ -2,10 +2,9 @@
   "name": "stream-alert",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
   "scripts": {
-    "start": "rm -rf ./dist/ && node -r tsconfig-paths/register -r ts-node/register src/main.ts",
-    "types": "node-config-ts"
+    "start": "ts-node -r tsconfig-paths/register src/main.ts",
+    "typess": "node-config-ts"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

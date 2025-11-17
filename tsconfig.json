@@ -1,26 +1,21 @@
 {
   "compilerOptions": {
+    "target": "es2016",
     "baseUrl": ".",
     "paths": {
       "@/*": [
         "src/*"
       ]
     },
-    "rootDir": ".",
-    "strictNullChecks": true,
-    "resolveJsonModule": true,
+    "module": "commonjs",
+    "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "module": "commonjs",
-    "target": "es2016",
-    "noImplicitAny": true,
-    "removeComments": true,
-    "preserveConstEnums": true,
-    "sourceMap": true
+    "rootDir": "."
   },
-  "include": ["src/**/*", "config/**/*"],
-  "exclude": ["node_modules", "dist", "build"]
+  "include": ["."]
 }

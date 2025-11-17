@@ -3,7 +3,7 @@ import {Telegraf} from "telegraf";
 
 @Injectable()
 export class TelegramService {
-  private lastNotificationTime = 0;
+  private lastNotificationTime = Date.now();
 
   constructor(
     private readonly logger: Logger,

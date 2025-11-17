@@ -1,18 +1,11 @@
 /* eslint-disable no-console */
-import {
-  ConsoleLogger,
-  Injectable,
-} from '@nestjs/common';
+import {ConsoleLogger, Injectable,} from '@nestjs/common';
 import clc from 'cli-color';
-import {AsyncLocalStorage} from 'async_hooks';
-import {SemaphorService} from "@/semaphor/semaphor-service";
 
 
 @Injectable()
 class CustomLogger extends ConsoleLogger {
-  constructor(private readonly asyncStorage: AsyncLocalStorage<Map<string, any>>) {
-    super();
-  }
+
   private logFormat(
     level: string,
     message: string,
@@ -21,8 +14,8 @@ class CustomLogger extends ConsoleLogger {
   ): string {
     const timestamp = clc.xterm(100)(`[${this.getCurrentTime()}]`);
 
-    const store = this.asyncStorage.getStore();
-    const id =  store ?  levelColor(store.get(SemaphorService.COMB_KEY) as string):  levelColor(level);
+
+    const id =  levelColor(level);
     return `${timestamp} ${id}: ${messageStyle ? messageStyle(message) : message}`;
   }
 
