@@ -4,18 +4,29 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "start": "ts-node src",
-    "startbot": "ts-node src/bot.ts",
-    "postinstall": "node-config-ts"
+    "start": "rm -rf ./dist/ && node -r tsconfig-paths/register -r ts-node/register src/main.ts",
+    "types": "node-config-ts"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "^11.1.8",
+    "@types/cli-color": "^2.0.6",
+    "@types/node": "^24.10.0",
+    "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
+    "@nestjs/common": "^11.1.8",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.8",
+    "cli-color": "^2.0.4",
+    "openai": "^6.8.1",
+    "reflect-metadata": "^0.2.2",
     "jimp": "^1.6.0",
     "node-config-ts": "^3.3.1",
     "pixelmatch": "^7.1.0",
     "telegraf": "^4.16.3",
     "ts-node": "^10.9.2"
-  },
-  "devDependencies": {
-    "typescript": "^5.5.3"
   }
 }
