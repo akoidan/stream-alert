@@ -14,7 +14,7 @@ namespace Capture {
     public:
         SimpleCapture() : hWnd(nullptr), isCapturing(false), frameSize(0) {}
         
-        bool Initialize(const char* deviceName, int frameRate) {
+        void Initialize(const char* deviceName, int frameRate) {
             // For now, just create a dummy frame buffer
             // In a real implementation, this would initialize DirectShow
             frameSize = 640 * 480 * 3; // RGB frame size
@@ -26,18 +26,14 @@ namespace Capture {
                 frameBuffer[i + 1] = static_cast<uint8_t>((i / 3) % 255); // G  
                 frameBuffer[i + 2] = static_cast<uint8_t>((i / 6) % 255); // B
             }
-            
-            return true;
         }
         
-        bool Start() {
+        void Start() {
             isCapturing = true;
-            return true;
         }
         
-        bool Stop() {
+        void Stop() {
             isCapturing = false;
-            return true;
         }
         
         Napi::Buffer<uint8_t> GetFrame(Napi::Env env) {
@@ -81,9 +77,13 @@ namespace Capture {
         }
         
         g_capture = std::make_unique<SimpleCapture>();
-        bool success = g_capture->Initialize(deviceName.c_str(), frameRate);
+        try {
+            g_capture->Initialize(deviceName.c_str(), frameRate);
+        } catch (const std::exception& e) {
+            Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
+        }
         
-        return Napi::Boolean::New(env, success);
+        return env.Undefined();
     }
     
     Napi::Value Start(const Napi::CallbackInfo& info) {
@@ -94,8 +94,13 @@ namespace Capture {
             return env.Null();
         }
         
-        bool success = g_capture->Start();
-        return Napi::Boolean::New(env, success);
+        try {
+            g_capture->Start();
+        } catch (const std::exception& e) {
+            Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
+        }
+        
+        return env.Undefined();
     }
     
     Napi::Value Stop(const Napi::CallbackInfo& info) {
@@ -106,8 +111,13 @@ namespace Capture {
             return env.Null();
         }
         
-        bool success = g_capture->Stop();
-        return Napi::Boolean::New(env, success);
+        try {
+            g_capture->Stop();
+        } catch (const std::exception& e) {
+            Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
+        }
+        
+        return env.Undefined();
     }
     
     Napi::Value GetFrame(const Napi::CallbackInfo& info) {

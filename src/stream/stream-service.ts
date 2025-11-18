@@ -1,10 +1,9 @@
 import {Injectable, Logger} from '@nestjs/common';
 import type {FrameDetector} from "@/app/app-model";
-import {INativeModule} from "@/native/native-model";
+import { INativeModule } from '@/native/native-model';
 
 @Injectable()
 export class StreamService {
-
   private frameInterval: NodeJS.Timeout | null = null;
 
   constructor(
@@ -17,11 +16,8 @@ export class StreamService {
 
   async listen(frameListener: FrameDetector): Promise<void> {
     try {
-      const initialized = this.captureService.initialize(this.cameraName, this.frameRate);
-      if (!initialized) throw new Error(`Failed to initialize DirectShow capture for device: ${this.cameraName}`);
-
-      const started = this.captureService.start();
-      if (!started) throw new Error('Failed to start DirectShow capture');
+      this.captureService.initialize(this.cameraName, this.frameRate);
+      this.captureService.start();
 
       this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
 
