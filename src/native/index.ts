@@ -3,7 +3,7 @@ import * as path from 'path';
 // Try to load the native module
 let nativeModule: any;
 try {
-  const nativePath = path.join(__dirname, '../../..', 'build', 'Release', 'dshow_capture.node');
+  const nativePath = path.join(__dirname, '../..', 'build', 'Release', 'dshow_capture.node');
   nativeModule = require(nativePath);
 } catch (error) {
   console.error('Failed to load native DirectShow module:', error);
