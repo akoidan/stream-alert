@@ -8,9 +8,10 @@ import {ImagelibModule} from "@/imagelib/imagelib-module";
 import {ImagelibService} from "@/imagelib/imagelib-service";
 import {StreamModule} from "@/stream/stream-module";
 import {AppService} from "@/app/app-service";
+import {NativeModule} from "@/native/native-module";
 
 @Module({
-  imports: [StreamModule, TelegramModule, ImagelibModule],
+  imports: [StreamModule, TelegramModule, ImagelibModule, NativeModule],
   providers: [Logger, AppService]
 })
 export class AppModule implements OnModuleInit {

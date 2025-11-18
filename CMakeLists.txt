@@ -1,71 +1,44 @@
-cmake_minimum_required(VERSION 3.16)
-project(dshow_capture)
+cmake_minimum_required(VERSION 3.15)
+cmake_policy(SET CMP0091 NEW)
+cmake_policy(SET CMP0042 NEW)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project (native)
 
-# Find Node.js headers
-execute_process(
-  COMMAND node -p "require('node-addon-api').include"
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE NODE_ADDON_API_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+add_definitions(-DNAPI_VERSION=4)
 
-message(STATUS "Node addon API dir: ${NODE_ADDON_API_DIR}")
-
-# Include directories
-include_directories(${NODE_ADDON_API_DIR})
 include_directories(${CMAKE_JS_INC})
+include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 
-# Add NAPI definitions
-add_definitions(-DNAPI_DISABLE_CPP_EXCEPTIONS)
-
-# Find Windows SDK automatically
-find_path(WINDOWS_SDK_INCLUDE_DIR
-    NAMES strmiids.h
-    PATHS
-    "C:/Program Files (x86)/Windows Kits/10/Include/*/um"
-    "C:/Program Files/Windows Kits/10/Include/*/um"
-    "C:/Program Files (x86)/Windows Kits/8.1/Include/um"
-    "C:/Program Files/Windows Kits/8.1/Include/um"
-    DOC "Windows SDK include directory"
-)
-
-if(WINDOWS_SDK_INCLUDE_DIR)
-    message(STATUS "Found Windows SDK: ${WINDOWS_SDK_INCLUDE_DIR}")
-    include_directories(${WINDOWS_SDK_INCLUDE_DIR})
-    
-    # Also include shared directory
-    get_filename_component(SHARED_DIR ${WINDOWS_SDK_INCLUDE_DIR} DIRECTORY)
-    include_directories("${SHARED_DIR}/shared")
-else()
-    message(WARNING "Windows SDK not found. DirectShow headers may be missing.")
+if (UNIX AND APPLE)
+    message(STATUS "macOS build - not supported")
+elseif (WIN32)
+    message(STATUS "Windows build")
+elseif (UNIX AND NOT APPLE)
+    message(STATUS "Linux build - not supported")
 endif()
 
-# Add DirectShow specific definitions
-add_definitions(-DWIN32_LEAN_AND_MEAN)
-add_definitions(-DNOMINMAX)
+if(WIN32)
+    file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/win32/headers/**.h")
+    file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/**.cc")
+    set(SOURCE_FILES ${SOURCES} ${HEADERS})
+elseif(UNIX AND NOT APPLE)
+    message(FATAL_ERROR "Linux not supported")
+elseif(UNIX AND APPLE)
+    message(FATAL_ERROR "macOS not supported")
+else()
+    message(FATAL_ERROR "Unsupported OS")
+endif()
 
-# Source files
-set(SOURCES
-  src/native/simple_capture.cpp
-)
-
-# Create shared library
-add_library(${PROJECT_NAME} SHARED ${SOURCES} ${CMAKE_JS_SRC})
-
-# Set target properties
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME} 
-  ${CMAKE_JS_LIB}
-  vfw32.lib
-)
-
-# Windows specific settings
 if(WIN32)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE WIN32_LEAN_AND_MEAN)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX)
+    target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} vfw32.lib)
+elseif(UNIX)
+    target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB})
+endif()
+
+if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
+  # Generate node.lib
+  execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
 endif()
