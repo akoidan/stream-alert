@@ -10,5 +10,6 @@ yarn-error.log*
 config/user
 /.pnp
 .pnp.js
-
+build
 .vscode/*
+.vs
