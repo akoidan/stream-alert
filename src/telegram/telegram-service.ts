@@ -1,6 +1,8 @@
 import {Injectable, Logger} from '@nestjs/common';
 import {Telegraf} from "telegraf";
 import {TelegramCommands} from "@/telegram/telegram-model";
+import type {TgCommandsExecutor} from "@/app/app-model";
+import {CommandContextExtn} from "telegraf/typings/telegram-types";
 
 @Injectable()
 export class TelegramService {
@@ -15,16 +17,26 @@ export class TelegramService {
   ) {
   }
 
-  async setup(onImage: () => Promise<void>): Promise<void> {
+  async setup(commandListener: TgCommandsExecutor): Promise<void> {
     this.logger.log("Starting telegram service");
     await this.bot.telegram.setMyCommands([
       {command: TelegramCommands.image, description: "Get the last image"},
+      {command: TelegramCommands.set_threshold, description: "Sets new amount of pixels to be changes to fire a notification"},
+      {command: TelegramCommands.increase_threshold, description: "Double the amount of pixels related to current value to spot a diff"},
+      {command: TelegramCommands.decrease_threshold, description: "Reduces the amount of pixels related to current value to spot a diff"},
     ]);
-    this.bot.command(TelegramCommands.image, onImage);
+    this.bot.command(TelegramCommands.image, () => commandListener.onAskImage());
+    this.bot.command(TelegramCommands.set_threshold, (a: CommandContextExtn) => commandListener.onSetThreshold(a));
+    this.bot.command(TelegramCommands.increase_threshold, () => commandListener.onIncreaseThreshold());
+    this.bot.command(TelegramCommands.decrease_threshold, () => commandListener.onDecreaseThreshold());
     await this.bot.launch();
   }
 
-  async sendMessage(data: Buffer): Promise<void> {
+  async sendText(text: string): Promise<void> {
+    await this.bot.telegram.sendMessage(this.chatId, text);
+  }
+
+  async sendImage(data: Buffer): Promise<void> {
     const newNotificationTime = Date.now();
     const diffDate = newNotificationTime - this.lastNotificationTime;
     if (diffDate > this.spamDelay) {

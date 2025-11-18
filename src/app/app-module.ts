@@ -7,36 +7,20 @@ import {ImagelibModule} from "@/imagelib/imagelib-module";
 
 import {ImagelibService} from "@/imagelib/imagelib-service";
 import {StreamModule} from "@/stream/stream-module";
+import {AppService} from "@/app/app-service";
 
 @Module({
   imports: [StreamModule, TelegramModule, ImagelibModule],
-  providers: [Logger]
+  providers: [Logger, AppService]
 })
 export class AppModule implements OnModuleInit {
 
   constructor(
-    private readonly ss: StreamService,
-    private readonly telegram: TelegramService,
-    private readonly im: ImagelibService,
-    private readonly logger: Logger,
+    private readonly as: AppService,
   ) {
   }
 
   async onModuleInit() {
-    await this.ss.listen(async (frameData: Buffer<ArrayBuffer>) => {
-      const image = await this.im.getImageIfItsChanged(frameData);
-      if (image) {
-        await this.telegram.sendMessage(image);
-      }
-    });
-    await this.telegram.setup(async () => {
-      this.logger.log(`Got image command`);
-      const image = await this.im.getLastImage();
-      if (image) {
-        await this.telegram.sendMessage(image);
-      } else {
-        this.logger.log(`No current image found, skipping`);
-      }
-    });
+    await this.as.run();
   }
 }

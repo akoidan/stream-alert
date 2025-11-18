@@ -1,7 +1,6 @@
 import {Injectable, Logger} from '@nestjs/common';
 import {spawn} from "child_process";
-import {TelegramService} from "@/telegram/telegram-service";
-import {ImagelibService} from "@/imagelib/imagelib-service";
+import type {FrameDetector} from "@/app/app-model";
 
 @Injectable()
 export class StreamService {
@@ -24,7 +23,7 @@ export class StreamService {
     ]
   }
 
-  async listen(onImage: (buffer: Buffer<ArrayBuffer>) => Promise<void>): Promise<void> {
+  async listen(frameListener: FrameDetector): Promise<void> {
     const ff = spawn("ffmpeg", this.ffmpegArgs);
 
     ff.stderr.on("data", d => {
@@ -48,7 +47,7 @@ export class StreamService {
         }
         const frameData = this.buffer.slice(SOI, EOI + 2);
         this.buffer = this.buffer.slice(EOI + 2);
-        await onImage(frameData);
+        await frameListener.onNewFrame(frameData);
       } catch (err) {
         this.logger.error("Failed to parse frame", err);
       }

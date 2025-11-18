@@ -9,18 +9,18 @@ export class ImagelibService {
   constructor(
     private readonly logger: Logger,
     private readonly threshold: number,
-    private readonly diffThreshold: number,
+    public diffThreshold: number,
   ) {
   }
 
-  async getLastImage(): Promise<Buffer|null> {
+  async getLastImage(): Promise<Buffer | null> {
     if (this.oldFrame) {
       return this.oldFrame.getBuffer('image/jpeg');
     }
     return null;
   }
 
-  async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer|null> {
+  async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
     const newFrame = await Jimp.read(frameData);
 
     if (!this.oldFrame) {
