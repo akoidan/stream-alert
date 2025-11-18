@@ -1,15 +1,11 @@
 interface INativeModule {
   /**
-   * Initializes the capture device
+   * Starts video capture with callback
    * @param deviceName - Name of the video device to capture from
    * @param frameRate - Desired frame rate for capture
+   * @param callback - Function called when new frames are available
    */
-  initialize(deviceName: string, frameRate: number): void;
-
-  /**
-   * Starts video capture
-   */
-  start(): void;
+  start(deviceName: string, frameRate: number, callback: (frameInfo: any) => void): void;
 
   /**
    * Stops video capture

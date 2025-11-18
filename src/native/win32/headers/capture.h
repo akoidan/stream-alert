@@ -19,17 +19,6 @@ EXTERN_C const CLSID CLSID_SampleGrabber;
 
 #pragma comment(lib, "strmiids.lib")
 
-// Node.js native API functions
-Napi::Object InitCapture(Napi::Env env, Napi::Object exports);
-
-namespace Capture {
-    // DirectShow capture functions
-    Napi::Value Initialize(const Napi::CallbackInfo& info);
-    Napi::Value Start(const Napi::CallbackInfo& info);
-    Napi::Value Stop(const Napi::CallbackInfo& info);
-    Napi::Value GetFrame(const Napi::CallbackInfo& info);
-}
-
 // Global variables for DirectShow
 extern IGraphBuilder* g_graphBuilder;
 extern IMediaControl* g_mediaControl;
@@ -37,7 +26,35 @@ extern IBaseFilter* g_videoFilter;
 extern DexterLib::ISampleGrabber* g_sampleGrabber;
 extern IBaseFilter* g_grabberFilter;
 
-// Frame data storage
-extern std::vector<uint8_t> g_latestFrame;
+// Frame data
+extern std::vector<uint8_t> g_frameData;
 extern std::mutex g_frameMutex;
-extern bool g_shouldStop;
+extern bool g_isCapturing;
+extern std::thread g_captureThread;
+
+// Callback reference
+extern Napi::ThreadSafeFunction g_callbackFunction;
+
+// Cleanup DirectShow resources
+void CleanupDirectShow();
+
+// Initialize DirectShow and start capture
+void StartCapture(const std::string& deviceName, int fps);
+
+// Stop capture
+void StopCapture();
+
+// N-API functions
+namespace Capture {
+    // Start capture with device name, fps, and callback
+    Napi::Value Start(const Napi::CallbackInfo& info);
+    
+    // Stop capture
+    Napi::Value Stop(const Napi::CallbackInfo& info);
+    
+    // Get latest frame
+    Napi::Value GetFrame(const Napi::CallbackInfo& info);
+}
+
+// Initialize module
+Napi::Object InitCapture(Napi::Env env, Napi::Object exports);

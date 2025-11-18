@@ -5,8 +5,6 @@ import {INativeModule} from "@/native/native-model";
 @Injectable()
 export class StreamService {
 
-  private frameInterval: NodeJS.Timeout | null = null;
-
   constructor(
     private readonly logger: Logger,
     private readonly captureService: INativeModule,
@@ -17,13 +15,10 @@ export class StreamService {
 
   async listen(frameListener: FrameDetector): Promise<void> {
     try {
-      this.captureService.initialize(this.cameraName, this.frameRate);
-      this.captureService.start();
-
-      this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
-
-      const intervalMs = Math.floor(1000 / this.frameRate);
-      this.frameInterval = setInterval(async () => {
+      
+      // Start capture with the new API - pass the callback directly
+      this.captureService.start(this.cameraName, this.frameRate, async (frameInfo: any) => {
+        
         try {
           const frameData = this.captureService.getFrame();
           if (frameData) {
@@ -33,23 +28,12 @@ export class StreamService {
         } catch (err) {
           this.logger.error("Failed to process frame", err);
         }
-      }, intervalMs);
+      });
+
+      this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
     } catch (err) {
       this.logger.error("Failed to start DirectShow capture", err);
       throw err;
-    }
-  }
-
-  async stop(): Promise<void> {
-    if (this.frameInterval) {
-      clearInterval(this.frameInterval);
-      this.frameInterval = null;
-    }
-    try {
-      this.captureService.stop();
-      this.logger.log("DirectShow capture stopped");
-    } catch (err) {
-      this.logger.error("Failed to stop DirectShow capture", err);
     }
   }
 }
