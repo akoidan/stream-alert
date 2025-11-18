@@ -4,27 +4,32 @@
   "description": "",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "typess": "node-config-ts"
+    "typess": "node-config-ts",
+    "install": "cmake-js compile",
+    "build-native": "cmake-js build",
+    "rebuild-native": "cmake-js rebuild"
   },
   "devDependencies": {
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
     "@nestjs/cli": "^11.0.10",
     "@nestjs/testing": "^11.1.8",
     "@types/cli-color": "^2.0.6",
     "@types/node": "^24.10.0",
-    "tsconfig-paths": "^4.2.0"
+    "node-addon-api": "^8.5.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.8",
     "cli-color": "^2.0.4",
-    "openai": "^6.8.1",
-    "reflect-metadata": "^0.2.2",
+    "cmake-js": "^7.1.0",
     "jimp": "^1.6.0",
     "node-config-ts": "^3.3.1",
+    "openai": "^6.8.1",
     "pixelmatch": "^7.1.0",
+    "reflect-metadata": "^0.2.2",
     "telegraf": "^4.16.3",
     "ts-node": "^10.9.2"
   }

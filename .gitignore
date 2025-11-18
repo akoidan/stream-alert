@@ -9,6 +9,7 @@ yarn-error.log*
 .idea
 config/user
 /.pnp
+build
 .pnp.js
 
 .vscode/*

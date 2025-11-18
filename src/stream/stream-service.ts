@@ -1,56 +1,68 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {spawn} from "child_process";
 import type {FrameDetector} from "@/app/app-model";
+import { DirectShowCaptureService } from '@/native';
 
 @Injectable()
 export class StreamService {
 
-  private buffer: Buffer = Buffer.alloc(0);
-  private readonly ffmpegArgs: string[];
+  private captureService: DirectShowCaptureService;
+  private frameInterval: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly logger: Logger,
-    cameraName: string,
-    frameRate: number,
+    private readonly cameraName: string,
+    private readonly frameRate: number,
   ) {
-    this.ffmpegArgs = [
-      "-f", "dshow",
-      "-i", `video=${cameraName}`,
-      "-r", `${frameRate}`,
-      "-vcodec", "mjpeg",
-      "-f", "image2pipe",
-      "-"
-    ]
+    this.captureService = new DirectShowCaptureService();
   }
 
   async listen(frameListener: FrameDetector): Promise<void> {
-    const ff = spawn("ffmpeg", this.ffmpegArgs);
-
-    ff.stderr.on("data", d => {
-      const data = String(d);
-      if (!data.startsWith("frame=")) {
-        console.error(data);
+    try {
+      // Initialize DirectShow capture
+      const initialized = this.captureService.initialize(this.cameraName, this.frameRate);
+      if (!initialized) {
+        throw new Error(`Failed to initialize DirectShow capture for device: ${this.cameraName}`);
       }
-    });
 
-    ff.stdout.on("data", async chunk => {
-      process.stdout.write(".");
-      try {
-        this.buffer = Buffer.concat([this.buffer, chunk]);
+      // Start capture
+      const started = this.captureService.start();
+      if (!started) {
+        throw new Error('Failed to start DirectShow capture');
+      }
 
-        // Look for JPEG frame boundaries
-        const SOI = this.buffer.indexOf(Buffer.from([0xFF, 0xD8]) as Uint8Array); // Start of Image
-        const EOI = this.buffer.indexOf(Buffer.from([0xFF, 0xD9]) as Uint8Array); // End of Image
+      this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
 
-        if (SOI === -1 || EOI === -1 || EOI < SOI) {
-          return;
+      // Start frame polling loop
+      const intervalMs = Math.floor(1000 / this.frameRate);
+      this.frameInterval = setInterval(async () => {
+        try {
+          const frameData = this.captureService.getFrame();
+          if (frameData) {
+            process.stdout.write(".");
+            await frameListener.onNewFrame(frameData as Buffer<ArrayBuffer>);
+          }
+        } catch (err) {
+          this.logger.error("Failed to process frame", err);
         }
-        const frameData = this.buffer.slice(SOI, EOI + 2);
-        this.buffer = this.buffer.slice(EOI + 2);
-        await frameListener.onNewFrame(frameData);
-      } catch (err) {
-        this.logger.error("Failed to parse frame", err);
-      }
-    })
+      }, intervalMs);
+
+    } catch (err) {
+      this.logger.error("Failed to start DirectShow capture", err);
+      throw err;
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.frameInterval) {
+      clearInterval(this.frameInterval);
+      this.frameInterval = null;
+    }
+    
+    try {
+      this.captureService.stop();
+      this.logger.log("DirectShow capture stopped");
+    } catch (err) {
+      this.logger.error("Failed to stop DirectShow capture", err);
+    }
   }
 }
