@@ -1,9 +1,10 @@
 import {Injectable, Logger} from '@nestjs/common';
 import type {FrameDetector} from "@/app/app-model";
-import { INativeModule } from '@/native/native-model';
+import {INativeModule} from "@/native/native-model";
 
 @Injectable()
 export class StreamService {
+
   private frameInterval: NodeJS.Timeout | null = null;
 
   constructor(

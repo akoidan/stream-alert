@@ -4,10 +4,8 @@
   "description": "",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "typess": "node-config-ts",
-    "install": "cmake-js compile",
-    "build-native": "cmake-js build",
-    "rebuild-native": "cmake-js rebuild"
+    "types": "node-config-ts",
+    "build-native": "cmake-js build --debug"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",

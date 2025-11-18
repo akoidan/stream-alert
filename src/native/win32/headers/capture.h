@@ -1,12 +1,10 @@
 #pragma once
 
 #include <napi.h>
-#include <windows.h>
-#include <vfw.h>
+
+Napi::Object InitCapture(Napi::Env env, Napi::Object exports);
 
 namespace Capture {
-    Napi::Object Init(Napi::Env env, Napi::Object exports);
-    
     class CaptureDevice {
     public:
         static Napi::Value Initialize(const Napi::CallbackInfo& info);
