@@ -37,7 +37,7 @@ extern Napi::ThreadSafeFunction g_callbackFunction;
 void CleanupDirectShow();
 
 // Initialize DirectShow and start capture
-void StartCapture(const std::string& deviceName, int fps);
+void StartCapture(Napi::Env env, const std::string& deviceName, int fps);
 
 // Stop capture
 void StopCapture();

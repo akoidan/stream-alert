@@ -26,6 +26,20 @@ bool g_isCapturing = false;
 // Callback reference
 Napi::ThreadSafeFunction g_callbackFunction;
 
+namespace {
+    void ReleaseCallbackFunction() {
+        if (g_callbackFunction) {
+            g_callbackFunction.Release();
+            g_callbackFunction = nullptr;
+        }
+    }
+
+    [[noreturn]] void ThrowCaptureError(Napi::Env env, const char* message) {
+        ReleaseCallbackFunction();
+        throw Napi::Error::New(env, message);
+    }
+}
+
 // Frame dimensions
 int g_frameWidth = 0;
 int g_frameHeight = 0;
@@ -199,7 +213,7 @@ IBaseFilter* FindCaptureDevice(const std::wstring& deviceName) {
 }
 
 // Initialize DirectShow and start capture
-void StartCapture(const std::string& deviceName, int fps) {
+void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     HRESULT hr;
     
     // Set target FPS
@@ -209,7 +223,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     // Initialize COM if not already initialized
     hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (hr != S_OK && hr != S_FALSE && hr != RPC_E_CHANGED_MODE) {
-        throw std::runtime_error("Failed to initialize COM");
+        ThrowCaptureError(env, "Failed to initialize COM");
     }
     
     // Convert device name to wstring
@@ -219,14 +233,14 @@ void StartCapture(const std::string& deviceName, int fps) {
     hr = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC_SERVER, 
                          IID_IGraphBuilder, (void**)&g_graphBuilder);
     if (FAILED(hr)) {
-        throw std::runtime_error("Failed to create graph builder");
+        ThrowCaptureError(env, "Failed to create graph builder");
     }
     
     // Get media control interface
     hr = g_graphBuilder->QueryInterface(IID_IMediaControl, (void**)&g_mediaControl);
     if (FAILED(hr)) {
         CleanupDirectShow();
-        throw std::runtime_error("Failed to get media control");
+        ThrowCaptureError(env, "Failed to get media control");
     }
     
     // Create capture graph builder
@@ -235,14 +249,14 @@ void StartCapture(const std::string& deviceName, int fps) {
                          IID_ICaptureGraphBuilder2, (void**)&captureBuilder);
     if (FAILED(hr)) {
         CleanupDirectShow();
-        throw std::runtime_error("Failed to create capture graph builder");
+        ThrowCaptureError(env, "Failed to create capture graph builder");
     }
     
     hr = captureBuilder->SetFiltergraph(g_graphBuilder);
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to set filter graph");
+        ThrowCaptureError(env, "Failed to set filter graph");
     }
     
     // Find video capture device
@@ -250,7 +264,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (!g_videoFilter) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to find video capture device");
+        ThrowCaptureError(env, "Failed to find video capture device");
     }
     
     // Add video filter to graph
@@ -258,7 +272,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to add video filter to graph");
+        ThrowCaptureError(env, "Failed to add video filter to graph");
     }
     
     // Create sample grabber filter
@@ -267,7 +281,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to create sample grabber filter");
+        ThrowCaptureError(env, "Failed to create sample grabber filter");
     }
     
     // Add sample grabber filter to graph
@@ -275,7 +289,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to add sample grabber filter to graph");
+        ThrowCaptureError(env, "Failed to add sample grabber filter to graph");
     }
     
     // Get sample grabber interface
@@ -283,7 +297,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to get sample grabber interface");
+        ThrowCaptureError(env, "Failed to get sample grabber interface");
     }
     
     // Set media type for sample grabber (YUY2 for better performance)
@@ -296,7 +310,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (!mt.pbFormat) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to allocate media type format");
+        ThrowCaptureError(env, "Failed to allocate media type format");
     }
     ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
     
@@ -319,7 +333,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to set sample grabber media type");
+        ThrowCaptureError(env, "Failed to set sample grabber media type");
     }
     
     // Set buffer size
@@ -327,7 +341,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to set buffer samples");
+        ThrowCaptureError(env, "Failed to set buffer samples");
     }
     
     // Set callback
@@ -335,7 +349,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to set sample grabber callback");
+        ThrowCaptureError(env, "Failed to set sample grabber callback");
     }
     
     // Create Null Renderer filter to prevent window from appearing
@@ -345,7 +359,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to create null renderer");
+        ThrowCaptureError(env, "Failed to create null renderer");
     }
     
     // Add null renderer to graph
@@ -354,7 +368,7 @@ void StartCapture(const std::string& deviceName, int fps) {
         nullRenderer->Release();
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to add null renderer to graph");
+        ThrowCaptureError(env, "Failed to add null renderer to graph");
     }
     
     // Connect the filters - capture -> sample grabber -> null renderer (no window)
@@ -364,7 +378,7 @@ void StartCapture(const std::string& deviceName, int fps) {
         nullRenderer->Release();
         captureBuilder->Release();
         CleanupDirectShow();
-        throw std::runtime_error("Failed to connect capture stream");
+        ThrowCaptureError(env, "Failed to connect capture stream");
     }
     
     // Release null renderer (graph maintains reference)
@@ -377,7 +391,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     hr = g_mediaControl->Run();
     if (FAILED(hr)) {
         CleanupDirectShow();
-        throw std::runtime_error("Failed to run graph");
+        ThrowCaptureError(env, "Failed to run graph");
     }
     
     // Get the actual media type to extract frame dimensions
@@ -428,11 +442,11 @@ namespace Capture {
         Napi::Env env = info.Env();
         
         if (info.Length() < 3) {
-            throw Napi::Error::New(env, "Invalid window handle");
+            throw Napi::Error::New(env, "Expected 3 arguments: deviceName, fps, callback");
         }
         
         if (!info[0].IsString() || !info[1].IsNumber() || !info[2].IsFunction()) {
-            throw Napi::Error::New(env, "Invalid window handle");
+            throw Napi::Error::New(env, "Invalid argument types");
         }
         
         std::string deviceName = info[0].As<Napi::String>().Utf8Value();
@@ -440,7 +454,7 @@ namespace Capture {
         Napi::Function callback = info[2].As<Napi::Function>();
         
         if (fps <= 0) {
-            throw Napi::Error::New(env, "Invalid window handle");
+            throw Napi::Error::New(env, "FPS must be greater than 0");
         }
         
         // Create thread-safe function
@@ -453,12 +467,7 @@ namespace Capture {
             [](Napi::Env) {}
         );
         
-        try {
-            StartCapture(deviceName, fps);
-        } catch (const std::exception& e) {
-            g_callbackFunction.Release();
-            throw Napi::Error::New(env, "Invalid window handle");
-        }
+        StartCapture(env, deviceName, fps);
         
         return env.Undefined();
     }

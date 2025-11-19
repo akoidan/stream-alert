@@ -14,26 +14,14 @@ export class StreamService {
   }
 
   async listen(frameListener: FrameDetector): Promise<void> {
-    try {
-      
-      // Start capture with the new API - pass the callback directly
-      this.captureService.start(this.cameraName, this.frameRate, async (frameInfo: any) => {
-        
-        try {
-          const frameData = this.captureService.getFrame();
-          if (frameData) {
-            process.stdout.write(".");
-            await frameListener.onNewFrame(frameData as Buffer<ArrayBuffer>);
-          }
-        } catch (err) {
-          this.logger.error("Failed to process frame", err);
-        }
-      });
-
-      this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
-    } catch (err) {
-      this.logger.error("Failed to start DirectShow capture", err);
-      throw err;
-    }
+    // Start capture with the new API - pass the callback directly
+    this.captureService.start(this.cameraName, this.frameRate, async (frameInfo: any) => {
+      const frameData = this.captureService.getFrame();
+      if (frameData) {
+        process.stdout.write(".");
+        await frameListener.onNewFrame(frameData as Buffer<ArrayBuffer>);
+      }
+    });
+    this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
   }
 }
