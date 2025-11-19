@@ -428,13 +428,11 @@ namespace Capture {
         Napi::Env env = info.Env();
         
         if (info.Length() < 3) {
-            Napi::Error::New(env, "Expected 3 arguments: deviceName, fps, callback").ThrowAsJavaScriptException();
-            return env.Undefined();
+            throw Napi::Error::New(env, "Invalid window handle");
         }
         
         if (!info[0].IsString() || !info[1].IsNumber() || !info[2].IsFunction()) {
-            Napi::Error::New(env, "Invalid argument types").ThrowAsJavaScriptException();
-            return env.Undefined();
+            throw Napi::Error::New(env, "Invalid window handle");
         }
         
         std::string deviceName = info[0].As<Napi::String>().Utf8Value();
@@ -442,8 +440,7 @@ namespace Capture {
         Napi::Function callback = info[2].As<Napi::Function>();
         
         if (fps <= 0) {
-            Napi::Error::New(env, "FPS must be greater than 0").ThrowAsJavaScriptException();
-            return env.Undefined();
+            throw Napi::Error::New(env, "Invalid window handle");
         }
         
         // Create thread-safe function
@@ -460,8 +457,7 @@ namespace Capture {
             StartCapture(deviceName, fps);
         } catch (const std::exception& e) {
             g_callbackFunction.Release();
-            Napi::Error::New(info.Env(), e.what()).ThrowAsJavaScriptException();
-            return info.Env().Undefined();
+            throw Napi::Error::New(env, "Invalid window handle");
         }
         
         return env.Undefined();
