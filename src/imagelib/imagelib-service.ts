@@ -25,34 +25,8 @@ export class ImagelibService {
       return null;
     }
 
-    // Check if this is raw RGB data (DirectShow RGB24)
-    // For now, assume 640x480 RGB24 format
-    const frameWidth = 640;
-    const frameHeight = 480;
-    const expectedSize = frameWidth * frameHeight * 3;
     
-    let newFrame: any;
-    
-    if (frameData.length === expectedSize) {
-      // Raw RGB24 data - convert to Jimp
-      newFrame = new Jimp({width: frameWidth, height: frameHeight});
-      
-      // Copy RGB data to Jimp bitmap (Jimp uses RGBA format)
-      const rgbaData = newFrame.bitmap.data as Uint8Array;
-      const rgbData = frameData as Uint8Array;
-      
-      for (let i = 0; i < frameWidth * frameHeight; i++) {
-        const srcIndex = i * 3; // RGB
-        const destIndex = i * 4; // RGBA
-        rgbaData[destIndex] = rgbData[srcIndex];     // R
-        rgbaData[destIndex + 1] = rgbData[srcIndex + 1]; // G
-        rgbaData[destIndex + 2] = rgbData[srcIndex + 2]; // B
-        rgbaData[destIndex + 3] = 255; // A (fully opaque)
-      }
-    } else {
-      // Assume it's a valid image format (JPEG/PNG/etc)
-      newFrame = await Jimp.read(frameData);
-    }
+    let newFrame: JimpInstance = await Jimp.read(frameData) as JimpInstance;
 
     if (!this.oldFrame) {
       this.oldFrame = newFrame;

@@ -4,6 +4,12 @@
 #include <chrono>
 #include <stdexcept>
 #include <cstring>
+#include <mutex>
+#include <vector>
+#include <dshow.h>
+#include <napi.h>
+
+#pragma comment(lib, "strmiids.lib")
 
 // Global DirectShow objects
 IGraphBuilder* g_graphBuilder = nullptr;
@@ -16,10 +22,20 @@ IBaseFilter* g_grabberFilter = nullptr;
 std::vector<uint8_t> g_frameData;
 std::mutex g_frameMutex;
 bool g_isCapturing = false;
-std::thread g_captureThread;
 
 // Callback reference
 Napi::ThreadSafeFunction g_callbackFunction;
+
+// Frame dimensions
+int g_frameWidth = 0;
+int g_frameHeight = 0;
+
+BITMAPINFOHEADER g_bitmapInfoHeader = {};
+bool g_hasMediaInfo = false;
+
+// Frame rate control
+std::chrono::steady_clock::time_point g_lastCallbackTime;
+int g_targetFps = 30;
 
 // Cleanup DirectShow resources
 void CleanupDirectShow() {
@@ -66,39 +82,7 @@ public:
         return E_NOINTERFACE;
     }
     
-    STDMETHODIMP SampleCB(double SampleTime, DexterLib::IMediaSample* pSample) override {
-        if (!pSample || !g_isCapturing) {
-            return S_OK;
-        }
-        
-        // Get the actual data
-        BYTE* pBuffer = nullptr;
-        long bufferLen = 0;
-        
-        HRESULT hr = pSample->GetPointer(&pBuffer);
-        if (SUCCEEDED(hr)) {
-            bufferLen = pSample->GetActualDataLength();
-            if (pBuffer && bufferLen > 0) {
-                std::lock_guard<std::mutex> lock(g_frameMutex);
-                g_frameData.assign(reinterpret_cast<uint8_t*>(pBuffer), reinterpret_cast<uint8_t*>(pBuffer) + bufferLen);
-                
-                // Call the JavaScript callback with frame data
-                if (g_callbackFunction) {
-                    // Create a copy of the frame data
-                    auto frameCopy = std::make_shared<std::vector<uint8_t>>(g_frameData);
-                    
-                    // Call the JavaScript callback
-                    g_callbackFunction.NonBlockingCall([frameCopy](Napi::Env env, Napi::Function jsCallback) {
-                        Napi::Object frameInfo = Napi::Object::New(env);
-                        frameInfo.Set("width", Napi::Number::New(env, 640));
-                        frameInfo.Set("height", Napi::Number::New(env, 480));
-                        frameInfo.Set("dataSize", Napi::Number::New(env, frameCopy->size()));
-                        jsCallback.Call({frameInfo});
-                    });
-                }
-            }
-        }
-        
+    STDMETHODIMP SampleCB(double /*SampleTime*/, DexterLib::IMediaSample* /*pSample*/) override {
         return S_OK;
     }
     
@@ -108,26 +92,50 @@ public:
         }
         
         long dataSize = bufferLen;
-        if (dataSize > 0) {
+        if (dataSize > 0 && g_hasMediaInfo) {
+            BITMAPFILEHEADER fileHeader{};
+            fileHeader.bfType = 'MB';
+            fileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+            fileHeader.bfSize = fileHeader.bfOffBits + dataSize;
+
+            BITMAPINFOHEADER infoHeader = g_bitmapInfoHeader;
+            infoHeader.biSizeImage = dataSize;
+
+            auto bmpData = std::vector<uint8_t>(fileHeader.bfSize);
+            std::memcpy(bmpData.data(), &fileHeader, sizeof(BITMAPFILEHEADER));
+            std::memcpy(bmpData.data() + sizeof(BITMAPFILEHEADER), &infoHeader, sizeof(BITMAPINFOHEADER));
+            std::memcpy(bmpData.data() + fileHeader.bfOffBits, pBuffer, dataSize);
+
             std::lock_guard<std::mutex> lock(g_frameMutex);
-            g_frameData.assign(reinterpret_cast<uint8_t*>(pBuffer), reinterpret_cast<uint8_t*>(pBuffer) + dataSize);
-            
-            // Call the JavaScript callback with frame data
-            if (g_callbackFunction) {
-                // Create a copy of the frame data
-                auto frameCopy = std::make_shared<std::vector<uint8_t>>(g_frameData);
-                
-                // Call the JavaScript callback
-                g_callbackFunction.NonBlockingCall([frameCopy](Napi::Env env, Napi::Function jsCallback) {
-                    Napi::Object frameInfo = Napi::Object::New(env);
-                    frameInfo.Set("width", Napi::Number::New(env, 640));
-                    frameInfo.Set("height", Napi::Number::New(env, 480));
-                    frameInfo.Set("dataSize", Napi::Number::New(env, frameCopy->size()));
-                    jsCallback.Call({frameInfo});
-                });
+            g_frameData = bmpData;
+
+            // Frame rate control - only callback at target FPS
+            auto now = std::chrono::steady_clock::now();
+            auto interval = std::chrono::milliseconds(1000 / g_targetFps);
+
+            if (now - g_lastCallbackTime >= interval) {
+                g_lastCallbackTime = now;
+
+                if (g_callbackFunction) {
+                    auto frameCopy = std::make_shared<std::vector<uint8_t>>(g_frameData);
+                    auto frameWidth = g_frameWidth > 0 ? g_frameWidth : infoHeader.biWidth;
+                    auto frameHeight = g_frameHeight > 0 ? g_frameHeight : infoHeader.biHeight;
+
+                    g_callbackFunction.NonBlockingCall([frameCopy, frameWidth, frameHeight](Napi::Env env, Napi::Function jsCallback) {
+                        Napi::Object frameInfo = Napi::Object::New(env);
+                        frameInfo.Set("width", Napi::Number::New(env, frameWidth));
+                        frameInfo.Set("height", Napi::Number::New(env, frameHeight));
+                        frameInfo.Set("dataSize", Napi::Number::New(env, frameCopy->size()));
+
+                        Napi::Buffer<uint8_t> frameBuffer = Napi::Buffer<uint8_t>::Copy(env, frameCopy->data(), frameCopy->size());
+                        frameInfo.Set("data", frameBuffer);
+
+                        jsCallback.Call({frameInfo});
+                    });
+                }
             }
         }
-        
+
         return S_OK;
     }
 };
@@ -190,37 +198,13 @@ IBaseFilter* FindCaptureDevice(const std::wstring& deviceName) {
     return nullptr;
 }
 
-// Capture thread function
-void CaptureThreadFunction(int fps) {
-    auto interval = std::chrono::milliseconds(1000 / fps);
-    
-    while (g_isCapturing) {
-        auto startTime = std::chrono::steady_clock::now();
-        
-        // Get current frame
-        long bufferSize = 0;
-        HRESULT hr = g_sampleGrabber->GetCurrentBuffer(&bufferSize, nullptr);
-        if (SUCCEEDED(hr) && bufferSize > 0) {
-            std::vector<uint8_t> buffer(bufferSize);
-            hr = g_sampleGrabber->GetCurrentBuffer(&bufferSize, reinterpret_cast<long*>(buffer.data()));
-            if (SUCCEEDED(hr)) {
-                std::lock_guard<std::mutex> lock(g_frameMutex);
-                g_frameData = std::move(buffer);
-            }
-        }
-        
-        auto endTime = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-        
-        if (elapsed < interval) {
-            std::this_thread::sleep_for(interval - elapsed);
-        }
-    }
-}
-
 // Initialize DirectShow and start capture
 void StartCapture(const std::string& deviceName, int fps) {
     HRESULT hr;
+    
+    // Set target FPS
+    g_targetFps = fps;
+    g_lastCallbackTime = std::chrono::steady_clock::now();
     
     // Initialize COM if not already initialized
     hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -302,14 +286,36 @@ void StartCapture(const std::string& deviceName, int fps) {
         throw std::runtime_error("Failed to get sample grabber interface");
     }
     
-    // Set media type for sample grabber (RGB24)
+    // Set media type for sample grabber (YUY2 for better performance)
     DexterLib::_AMMediaType mt;
     ZeroMemory(&mt, sizeof(mt));
     mt.majortype = MEDIATYPE_Video;
     mt.subtype = MEDIASUBTYPE_RGB24;
     mt.formattype = FORMAT_VideoInfo;
+    mt.pbFormat = (unsigned char*)CoTaskMemAlloc(sizeof(VIDEOINFOHEADER));
+    if (!mt.pbFormat) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        throw std::runtime_error("Failed to allocate media type format");
+    }
+    ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
+    
+    // Set frame rate in VIDEOINFOHEADER
+    VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)mt.pbFormat;
+    pvi->AvgTimePerFrame = 10000000LL / fps; // Convert FPS to 100ns units
+    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    pvi->bmiHeader.biWidth = 0;  // Let camera decide
+    pvi->bmiHeader.biHeight = 0; // Let camera decide
+    pvi->bmiHeader.biPlanes = 1;
+    pvi->bmiHeader.biBitCount = 24;
+    pvi->bmiHeader.biCompression = BI_RGB;
+    mt.cbFormat = sizeof(VIDEOINFOHEADER);
     
     hr = g_sampleGrabber->SetMediaType(&mt);
+    // Free the format block
+    if (mt.pbFormat) {
+        CoTaskMemFree(mt.pbFormat);
+    }
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
@@ -325,7 +331,7 @@ void StartCapture(const std::string& deviceName, int fps) {
     }
     
     // Set callback
-    hr = g_sampleGrabber->SetCallback(&g_callback, 0);  // Use 0 for BufferCB
+    hr = g_sampleGrabber->SetCallback(&g_callback, 1);  // Use BufferCB
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
@@ -367,29 +373,45 @@ void StartCapture(const std::string& deviceName, int fps) {
     // Release capture graph builder
     captureBuilder->Release();
     
-    // Start capture thread
-    g_isCapturing = true;
-    g_captureThread = std::thread(CaptureThreadFunction, fps);
-    
     // Start the graph
     hr = g_mediaControl->Run();
     if (FAILED(hr)) {
-        g_isCapturing = false;
-        if (g_captureThread.joinable()) {
-            g_captureThread.join();
-        }
         CleanupDirectShow();
         throw std::runtime_error("Failed to run graph");
     }
+    
+    // Get the actual media type to extract frame dimensions
+    DexterLib::_AMMediaType connectedMt;
+    hr = g_sampleGrabber->GetConnectedMediaType(&connectedMt);
+    if (SUCCEEDED(hr) && connectedMt.formattype == FORMAT_VideoInfo && connectedMt.pbFormat &&
+        connectedMt.cbFormat >= sizeof(VIDEOINFOHEADER)) {
+        VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)connectedMt.pbFormat;
+        if (pvi) {
+            g_frameWidth = pvi->bmiHeader.biWidth;
+            g_frameHeight = pvi->bmiHeader.biHeight;
+
+            g_bitmapInfoHeader = {};
+            g_bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
+            g_bitmapInfoHeader.biWidth = g_frameWidth;
+            g_bitmapInfoHeader.biHeight = g_frameHeight;
+            g_bitmapInfoHeader.biPlanes = 1;
+            g_bitmapInfoHeader.biBitCount = 24;
+            g_bitmapInfoHeader.biCompression = BI_RGB;
+            g_bitmapInfoHeader.biSizeImage = pvi->bmiHeader.biSizeImage;
+            g_hasMediaInfo = true;
+        }
+        if (connectedMt.pbFormat) {
+            CoTaskMemFree(connectedMt.pbFormat);
+        }
+    }
+
+    g_isCapturing = g_hasMediaInfo;
 }
 
 // Stop capture
 void StopCapture() {
     g_isCapturing = false;
-    
-    if (g_captureThread.joinable()) {
-        g_captureThread.join();
-    }
+    g_hasMediaInfo = false;
     
     if (g_callbackFunction) {
         g_callbackFunction.Release();

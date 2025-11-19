@@ -4,7 +4,6 @@
 #include <windows.h>
 #include <dshow.h>
 #include <vector>
-#include <thread>
 #include <mutex>
 
 // Import qedit.dll for SampleGrabber interface
@@ -30,7 +29,6 @@ extern IBaseFilter* g_grabberFilter;
 extern std::vector<uint8_t> g_frameData;
 extern std::mutex g_frameMutex;
 extern bool g_isCapturing;
-extern std::thread g_captureThread;
 
 // Callback reference
 extern Napi::ThreadSafeFunction g_callbackFunction;
