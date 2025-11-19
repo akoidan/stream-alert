@@ -6,7 +6,9 @@
 #include <cstring>
 #include <mutex>
 #include <vector>
+#include <atomic>
 #include <dshow.h>
+#include <dvdmedia.h>
 #include <napi.h>
 
 #pragma comment(lib, "strmiids.lib")
@@ -22,6 +24,14 @@ IBaseFilter* g_grabberFilter = nullptr;
 std::vector<uint8_t> g_frameData;
 std::mutex g_frameMutex;
 bool g_isCapturing = false;
+std::atomic<uint64_t> g_rawSamples{0};
+
+// Frame dimensions
+int g_frameWidth = 0;
+int g_frameHeight = 0;
+
+BITMAPINFOHEADER g_bitmapInfoHeader = {};
+bool g_hasMediaInfo = false;
 
 // Callback reference
 Napi::ThreadSafeFunction g_callbackFunction;
@@ -34,18 +44,40 @@ namespace {
         }
     }
 
+    void ConfigureBitmapInfo(const BITMAPINFOHEADER& header, DWORD imageSize) {
+        g_frameWidth = header.biWidth;
+        g_frameHeight = header.biHeight;
+
+        g_bitmapInfoHeader = {};
+        g_bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
+        g_bitmapInfoHeader.biWidth = header.biWidth;
+        g_bitmapInfoHeader.biHeight = header.biHeight;
+        g_bitmapInfoHeader.biPlanes = 1;
+        g_bitmapInfoHeader.biBitCount = header.biBitCount ? header.biBitCount : 24;
+        g_bitmapInfoHeader.biCompression = header.biCompression;
+        g_bitmapInfoHeader.biSizeImage = imageSize;
+
+        g_hasMediaInfo = true;
+
+        std::cout << "[capture] Configured bitmap info " << g_frameWidth << "x" << g_frameHeight
+                  << " (" << g_bitmapInfoHeader.biBitCount << "bpp, size " << imageSize << ")" << std::endl;
+    }
+
     [[noreturn]] void ThrowCaptureError(Napi::Env env, const char* message) {
         ReleaseCallbackFunction();
         throw Napi::Error::New(env, message);
     }
 }
 
-// Frame dimensions
-int g_frameWidth = 0;
-int g_frameHeight = 0;
-
-BITMAPINFOHEADER g_bitmapInfoHeader = {};
-bool g_hasMediaInfo = false;
+std::string GuidToString(const GUID& guid) {
+    LPOLESTR guidString = nullptr;
+    if (StringFromCLSID(guid, &guidString) == S_OK && guidString) {
+        std::wstring wideStr(guidString);
+        CoTaskMemFree(guidString);
+        return std::string(wideStr.begin(), wideStr.end());
+    }
+    return "<unknown-guid>";
+}
 
 // Frame rate control
 std::chrono::steady_clock::time_point g_lastCallbackTime;
@@ -101,8 +133,23 @@ public:
     }
     
     STDMETHODIMP BufferCB(double sampleTime, BYTE* pBuffer, long bufferLen) override {
-        if (!pBuffer || !g_isCapturing) {
+        static std::atomic<bool> loggedInactive{false};
+
+        if (!pBuffer) {
             return S_OK;
+        }
+
+        if (!g_isCapturing) {
+            if (!loggedInactive.exchange(true)) {
+                std::cout << "[capture] BufferCB invoked while g_isCapturing=false (dropping frames)" << std::endl;
+            }
+            return S_OK;
+        }
+
+        auto sampleIndex = ++g_rawSamples;
+        if (sampleIndex <= 5) {
+            std::cout << "[capture] BufferCB sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
+                      << ", sampleTime=" << sampleTime << std::endl;
         }
         
         long dataSize = bufferLen;
@@ -147,6 +194,10 @@ public:
                         jsCallback.Call({frameInfo});
                     });
                 }
+            } else if (sampleIndex % 30 == 0) {
+                auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(interval - (now - g_lastCallbackTime)).count();
+                std::cout << "[capture] Dropping frame due to FPS gate. sampleIndex=" << sampleIndex
+                          << ", waiting ~" << waitMs << "ms" << std::endl;
             }
         }
 
@@ -351,7 +402,67 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to set sample grabber callback");
     }
-    
+
+    // Inspect capture pin capabilities to debug device formats
+    IAMStreamConfig* streamConfig = nullptr;
+    hr = captureBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, g_videoFilter,
+                                       IID_IAMStreamConfig, (void**)&streamConfig);
+    if (SUCCEEDED(hr) && streamConfig) {
+        int capCount = 0;
+        int capSize = 0;
+        hr = streamConfig->GetNumberOfCapabilities(&capCount, &capSize);
+        if (SUCCEEDED(hr)) {
+            std::cout << "[capture] IAMStreamConfig reports " << capCount
+                      << " capabilities (capSize=" << capSize << ")." << std::endl;
+            std::vector<BYTE> capabilityBuffer(capSize);
+            for (int i = 0; i < capCount; ++i) {
+                AM_MEDIA_TYPE* mediaType = nullptr;
+                hr = streamConfig->GetStreamCaps(i, &mediaType, capabilityBuffer.data());
+                if (SUCCEEDED(hr) && mediaType) {
+                    std::cout << "[capture]  Cap #" << i
+                              << " major=" << GuidToString(mediaType->majortype)
+                              << " subtype=" << GuidToString(mediaType->subtype)
+                              << " format=" << GuidToString(mediaType->formattype) << std::endl;
+
+                    if (mediaType->formattype == FORMAT_VideoInfo && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER)) {
+                        auto* pvi = reinterpret_cast<VIDEOINFOHEADER*>(mediaType->pbFormat);
+                        if (pvi) {
+                            std::cout << "[capture]    VideoInfo " << pvi->bmiHeader.biWidth << "x"
+                                      << pvi->bmiHeader.biHeight << " @ "
+                                      << (pvi->AvgTimePerFrame ? 10000000LL / pvi->AvgTimePerFrame : 0)
+                                      << " fps" << std::endl;
+                        }
+                    } else if (mediaType->formattype == FORMAT_VideoInfo2 && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER2)) {
+                        auto* pvi2 = reinterpret_cast<VIDEOINFOHEADER2*>(mediaType->pbFormat);
+                        if (pvi2) {
+                            std::cout << "[capture]    VideoInfo2 " << pvi2->bmiHeader.biWidth << "x"
+                                      << pvi2->bmiHeader.biHeight << " @ "
+                                      << (pvi2->AvgTimePerFrame ? 10000000LL / pvi2->AvgTimePerFrame : 0)
+                                      << " fps" << std::endl;
+                        }
+                    }
+
+                    if (mediaType->cbFormat && mediaType->pbFormat) {
+                        CoTaskMemFree(mediaType->pbFormat);
+                        mediaType->pbFormat = nullptr;
+                    }
+                    if (mediaType->pUnk) {
+                        mediaType->pUnk->Release();
+                        mediaType->pUnk = nullptr;
+                    }
+                    CoTaskMemFree(mediaType);
+                } else {
+                    std::cout << "[capture]  Cap #" << i << " query failed (hr=" << std::hex << hr << ")" << std::endl;
+                }
+            }
+        } else {
+            std::cout << "[capture] GetNumberOfCapabilities failed (hr=" << std::hex << hr << ")" << std::endl;
+        }
+        streamConfig->Release();
+    } else {
+        std::cout << "[capture] IAMStreamConfig not available (hr=" << std::hex << hr << ")" << std::endl;
+    }
+
     // Create Null Renderer filter to prevent window from appearing
     IBaseFilter* nullRenderer = nullptr;
     hr = CoCreateInstance(CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
@@ -375,14 +486,34 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
                                       g_videoFilter, g_grabberFilter, nullRenderer);
     if (FAILED(hr)) {
+        std::cout << "[capture] Failed to connect capture pin (hr=" << std::hex << hr << ")" << std::endl;
         nullRenderer->Release();
         captureBuilder->Release();
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to connect capture stream");
+    } else {
+        std::cout << "[capture] Capture pin connected." << std::endl;
     }
     
     // Release null renderer (graph maintains reference)
     nullRenderer->Release();
+
+    // Optionally connect preview pin to a null renderer to satisfy devices that expect it
+    IBaseFilter* previewNullRenderer = nullptr;
+    hr = CoCreateInstance(CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_IBaseFilter, (void**)&previewNullRenderer);
+    if (SUCCEEDED(hr)) {
+        HRESULT previewHr = captureBuilder->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video,
+                                                         g_videoFilter, nullptr, previewNullRenderer);
+        if (SUCCEEDED(previewHr)) {
+            std::cout << "[capture] Preview pin connected to null renderer." << std::endl;
+        } else {
+            std::cout << "[capture] Preview pin connection failed (hr=" << std::hex << previewHr << ")" << std::endl;
+        }
+        previewNullRenderer->Release();
+    } else {
+        std::cout << "[capture] Failed to create preview null renderer (hr=" << std::hex << hr << ")" << std::endl;
+    }
     
     // Release capture graph builder
     captureBuilder->Release();
@@ -397,29 +528,41 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     // Get the actual media type to extract frame dimensions
     DexterLib::_AMMediaType connectedMt;
     hr = g_sampleGrabber->GetConnectedMediaType(&connectedMt);
-    if (SUCCEEDED(hr) && connectedMt.formattype == FORMAT_VideoInfo && connectedMt.pbFormat &&
-        connectedMt.cbFormat >= sizeof(VIDEOINFOHEADER)) {
-        VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)connectedMt.pbFormat;
-        if (pvi) {
-            g_frameWidth = pvi->bmiHeader.biWidth;
-            g_frameHeight = pvi->bmiHeader.biHeight;
+    if (SUCCEEDED(hr)) {
+        std::cout << "[capture] Connected media type GUID: " << GuidToString(connectedMt.formattype)
+                  << ", cbFormat=" << connectedMt.cbFormat << std::endl;
+    } else {
+        std::cout << "[capture] Failed to retrieve connected media type (hr=" << std::hex << hr << ")" << std::endl;
+    }
 
-            g_bitmapInfoHeader = {};
-            g_bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
-            g_bitmapInfoHeader.biWidth = g_frameWidth;
-            g_bitmapInfoHeader.biHeight = g_frameHeight;
-            g_bitmapInfoHeader.biPlanes = 1;
-            g_bitmapInfoHeader.biBitCount = 24;
-            g_bitmapInfoHeader.biCompression = BI_RGB;
-            g_bitmapInfoHeader.biSizeImage = pvi->bmiHeader.biSizeImage;
-            g_hasMediaInfo = true;
+    g_hasMediaInfo = false;
+    if (SUCCEEDED(hr) && connectedMt.pbFormat) {
+        if (connectedMt.formattype == FORMAT_VideoInfo && connectedMt.cbFormat >= sizeof(VIDEOINFOHEADER)) {
+            auto* pvi = reinterpret_cast<VIDEOINFOHEADER*>(connectedMt.pbFormat);
+            if (pvi) {
+                ConfigureBitmapInfo(pvi->bmiHeader, pvi->bmiHeader.biSizeImage);
+            }
+        } else if (connectedMt.formattype == FORMAT_VideoInfo2 && connectedMt.cbFormat >= sizeof(VIDEOINFOHEADER2)) {
+            auto* pvi2 = reinterpret_cast<VIDEOINFOHEADER2*>(connectedMt.pbFormat);
+            if (pvi2) {
+                ConfigureBitmapInfo(pvi2->bmiHeader, pvi2->bmiHeader.biSizeImage);
+            }
         }
-        if (connectedMt.pbFormat) {
-            CoTaskMemFree(connectedMt.pbFormat);
-        }
+        CoTaskMemFree(connectedMt.pbFormat);
+        connectedMt.pbFormat = nullptr;
+    }
+
+    if (!g_hasMediaInfo) {
+        std::cout << "[capture] No supported media info detected for GUID "
+                  << GuidToString(connectedMt.formattype) << "." << std::endl;
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Connected media type is not supported");
     }
 
     g_isCapturing = g_hasMediaInfo;
+    if (g_isCapturing) {
+        std::cout << "[capture] Capture pipeline active." << std::endl;
+    }
 }
 
 // Stop capture
