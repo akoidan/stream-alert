@@ -8,3 +8,7 @@ config/user
 .vscode/*
 .vs
 out
+/scripts/image.bmp
+/scripts/commandcam.exe
+/scripts/commandcam.obj
+/scripts/qedit.tlh

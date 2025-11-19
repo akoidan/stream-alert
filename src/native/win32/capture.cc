@@ -7,6 +7,8 @@
 #include <mutex>
 #include <vector>
 #include <atomic>
+#include <cstring>
+#include <cstdlib>
 #include <dshow.h>
 #include <dvdmedia.h>
 #include <napi.h>
@@ -32,6 +34,7 @@ int g_frameHeight = 0;
 
 BITMAPINFOHEADER g_bitmapInfoHeader = {};
 bool g_hasMediaInfo = false;
+bool g_captureFormatIsYuy2 = false;
 
 // Callback reference
 Napi::ThreadSafeFunction g_callbackFunction;
@@ -77,6 +80,78 @@ std::string GuidToString(const GUID& guid) {
         return std::string(wideStr.begin(), wideStr.end());
     }
     return "<unknown-guid>";
+}
+
+inline unsigned char ClampToByte(int value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return static_cast<unsigned char>(value);
+}
+
+void FreeMediaTypeContent(AM_MEDIA_TYPE& mt) {
+    if (mt.cbFormat && mt.pbFormat) {
+        CoTaskMemFree(mt.pbFormat);
+        mt.pbFormat = nullptr;
+        mt.cbFormat = 0;
+    }
+    if (mt.pUnk) {
+        mt.pUnk->Release();
+        mt.pUnk = nullptr;
+    }
+}
+
+void CopyMediaType(AM_MEDIA_TYPE& dest, const AM_MEDIA_TYPE* src) {
+    FreeMediaTypeContent(dest);
+    dest = *src;
+    if (src->cbFormat && src->pbFormat) {
+        dest.pbFormat = (BYTE*)CoTaskMemAlloc(src->cbFormat);
+        if (dest.pbFormat) {
+            std::memcpy(dest.pbFormat, src->pbFormat, src->cbFormat);
+            dest.cbFormat = src->cbFormat;
+        } else {
+            dest.cbFormat = 0;
+        }
+    } else {
+        dest.cbFormat = 0;
+        dest.pbFormat = nullptr;
+    }
+    dest.pUnk = nullptr;
+}
+
+void ConvertYuy2ToRgb24(const uint8_t* src, int width, int height, std::vector<uint8_t>& dst) {
+    int absHeight = std::abs(height);
+    dst.resize(static_cast<size_t>(width) * absHeight * 3);
+    int srcStride = width * 2;
+    int dstStride = width * 3;
+    for (int y = 0; y < absHeight; ++y) {
+        const uint8_t* srcRow = src + y * srcStride;
+        uint8_t* dstRow = dst.data() + y * dstStride;
+        for (int x = 0; x < width; x += 2) {
+            int idx = x * 2;
+            int y0 = srcRow[idx + 0];
+            int u = srcRow[idx + 1];
+            int y1 = srcRow[idx + 2];
+            int v = srcRow[idx + 3];
+            int d = u - 128;
+            int e = v - 128;
+            int c0 = y0 - 16;
+            int c1 = y1 - 16;
+            int r0 = (298 * c0 + 409 * e + 128) >> 8;
+            int g0 = (298 * c0 - 100 * d - 208 * e + 128) >> 8;
+            int b0 = (298 * c0 + 516 * d + 128) >> 8;
+            int r1 = (298 * c1 + 409 * e + 128) >> 8;
+            int g1 = (298 * c1 - 100 * d - 208 * e + 128) >> 8;
+            int b1 = (298 * c1 + 516 * d + 128) >> 8;
+            uint8_t* pixel0 = dstRow + x * 3;
+            uint8_t* pixel1 = dstRow + (x + 1) * 3;
+            pixel0[2] = ClampToByte(r0);
+            pixel0[1] = ClampToByte(g0);
+            pixel0[0] = ClampToByte(b0);
+            pixel1[2] = ClampToByte(r1);
+            pixel1[1] = ClampToByte(g1);
+            pixel1[0] = ClampToByte(b1);
+        }
+    }
 }
 
 // Frame rate control
@@ -154,18 +229,32 @@ public:
         
         long dataSize = bufferLen;
         if (dataSize > 0 && g_hasMediaInfo) {
+            BITMAPINFOHEADER infoHeader = g_bitmapInfoHeader;
+            const uint8_t* pixelData = pBuffer;
+            long pixelSize = dataSize;
+            std::vector<uint8_t> convertedBuffer;
+            if (g_captureFormatIsYuy2) {
+                int width = g_frameWidth != 0 ? g_frameWidth : infoHeader.biWidth;
+                int height = g_frameHeight != 0 ? g_frameHeight : infoHeader.biHeight;
+                ConvertYuy2ToRgb24(pBuffer, width, height, convertedBuffer);
+                pixelData = convertedBuffer.data();
+                pixelSize = static_cast<long>(convertedBuffer.size());
+                infoHeader.biCompression = BI_RGB;
+                infoHeader.biBitCount = 24;
+                infoHeader.biSizeImage = pixelSize;
+            } else {
+                infoHeader.biSizeImage = pixelSize;
+            }
+
             BITMAPFILEHEADER fileHeader{};
             fileHeader.bfType = 'MB';
             fileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-            fileHeader.bfSize = fileHeader.bfOffBits + dataSize;
-
-            BITMAPINFOHEADER infoHeader = g_bitmapInfoHeader;
-            infoHeader.biSizeImage = dataSize;
+            fileHeader.bfSize = fileHeader.bfOffBits + pixelSize;
 
             auto bmpData = std::vector<uint8_t>(fileHeader.bfSize);
             std::memcpy(bmpData.data(), &fileHeader, sizeof(BITMAPFILEHEADER));
             std::memcpy(bmpData.data() + sizeof(BITMAPFILEHEADER), &infoHeader, sizeof(BITMAPINFOHEADER));
-            std::memcpy(bmpData.data() + fileHeader.bfOffBits, pBuffer, dataSize);
+            std::memcpy(bmpData.data() + fileHeader.bfOffBits, pixelData, pixelSize);
 
             std::lock_guard<std::mutex> lock(g_frameMutex);
             g_frameData = bmpData;
@@ -351,60 +440,13 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         ThrowCaptureError(env, "Failed to get sample grabber interface");
     }
     
-    // Set media type for sample grabber (YUY2 for better performance)
-    DexterLib::_AMMediaType mt;
-    ZeroMemory(&mt, sizeof(mt));
-    mt.majortype = MEDIATYPE_Video;
-    mt.subtype = MEDIASUBTYPE_RGB24;
-    mt.formattype = FORMAT_VideoInfo;
-    mt.pbFormat = (unsigned char*)CoTaskMemAlloc(sizeof(VIDEOINFOHEADER));
-    if (!mt.pbFormat) {
-        captureBuilder->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to allocate media type format");
-    }
-    ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
-    
-    // Set frame rate in VIDEOINFOHEADER
-    VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)mt.pbFormat;
-    pvi->AvgTimePerFrame = 10000000LL / fps; // Convert FPS to 100ns units
-    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    pvi->bmiHeader.biWidth = 0;  // Let camera decide
-    pvi->bmiHeader.biHeight = 0; // Let camera decide
-    pvi->bmiHeader.biPlanes = 1;
-    pvi->bmiHeader.biBitCount = 24;
-    pvi->bmiHeader.biCompression = BI_RGB;
-    mt.cbFormat = sizeof(VIDEOINFOHEADER);
-    
-    hr = g_sampleGrabber->SetMediaType(&mt);
-    // Free the format block
-    if (mt.pbFormat) {
-        CoTaskMemFree(mt.pbFormat);
-    }
-    if (FAILED(hr)) {
-        captureBuilder->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to set sample grabber media type");
-    }
-    
-    // Set buffer size
-    hr = g_sampleGrabber->SetBufferSamples(TRUE);
-    if (FAILED(hr)) {
-        captureBuilder->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to set buffer samples");
-    }
-    
-    // Set callback
-    hr = g_sampleGrabber->SetCallback(&g_callback, 1);  // Use BufferCB
-    if (FAILED(hr)) {
-        captureBuilder->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to set sample grabber callback");
-    }
-
-    // Inspect capture pin capabilities to debug device formats
     IAMStreamConfig* streamConfig = nullptr;
+    GUID selectedSubtype = MEDIASUBTYPE_RGB24;
+    bool selectedIsYuy2 = false;
+    AM_MEDIA_TYPE chosenFormat;
+    ZeroMemory(&chosenFormat, sizeof(chosenFormat));
+    bool hasChosenFormat = false;
+
     hr = captureBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, g_videoFilter,
                                        IID_IAMStreamConfig, (void**)&streamConfig);
     if (SUCCEEDED(hr) && streamConfig) {
@@ -442,6 +484,34 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
                         }
                     }
 
+                    bool isRgb = (mediaType->subtype == MEDIASUBTYPE_RGB24 || mediaType->subtype == MEDIASUBTYPE_RGB32);
+                    bool isYuy2 = (mediaType->subtype == MEDIASUBTYPE_YUY2);
+                    bool takeCandidate = false;
+                    if (isRgb) {
+                        takeCandidate = true;
+                        selectedIsYuy2 = false;
+                    } else if (!hasChosenFormat && isYuy2) {
+                        takeCandidate = true;
+                        selectedIsYuy2 = true;
+                    }
+                    if (takeCandidate) {
+                        CopyMediaType(chosenFormat, mediaType);
+                        hasChosenFormat = true;
+                        selectedSubtype = mediaType->subtype;
+                        if (isRgb) {
+                            if (mediaType->cbFormat && mediaType->pbFormat) {
+                                CoTaskMemFree(mediaType->pbFormat);
+                                mediaType->pbFormat = nullptr;
+                            }
+                            if (mediaType->pUnk) {
+                                mediaType->pUnk->Release();
+                                mediaType->pUnk = nullptr;
+                            }
+                            CoTaskMemFree(mediaType);
+                            break;
+                        }
+                    }
+
                     if (mediaType->cbFormat && mediaType->pbFormat) {
                         CoTaskMemFree(mediaType->pbFormat);
                         mediaType->pbFormat = nullptr;
@@ -458,9 +528,77 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         } else {
             std::cout << "[capture] GetNumberOfCapabilities failed (hr=" << std::hex << hr << ")" << std::endl;
         }
+        if (hasChosenFormat) {
+            hr = streamConfig->SetFormat(&chosenFormat);
+            if (FAILED(hr)) {
+                FreeMediaTypeContent(chosenFormat);
+                streamConfig->Release();
+                captureBuilder->Release();
+                CleanupDirectShow();
+                ThrowCaptureError(env, "Failed to set capture format");
+            }
+        }
         streamConfig->Release();
     } else {
         std::cout << "[capture] IAMStreamConfig not available (hr=" << std::hex << hr << ")" << std::endl;
+    }
+
+    DexterLib::_AMMediaType mt;
+    ZeroMemory(&mt, sizeof(mt));
+    mt.majortype = MEDIATYPE_Video;
+    mt.subtype = selectedSubtype;
+    mt.formattype = FORMAT_VideoInfo;
+    mt.pbFormat = (unsigned char*)CoTaskMemAlloc(sizeof(VIDEOINFOHEADER));
+    if (!mt.pbFormat) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to allocate media type format");
+    }
+    ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
+
+    VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)mt.pbFormat;
+    pvi->AvgTimePerFrame = 10000000LL / fps;
+    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    pvi->bmiHeader.biWidth = 0;
+    pvi->bmiHeader.biHeight = 0;
+    pvi->bmiHeader.biPlanes = 1;
+    if (selectedSubtype == MEDIASUBTYPE_RGB32) {
+        pvi->bmiHeader.biBitCount = 32;
+        pvi->bmiHeader.biCompression = BI_RGB;
+        selectedIsYuy2 = false;
+    } else if (selectedSubtype == MEDIASUBTYPE_RGB24) {
+        pvi->bmiHeader.biBitCount = 24;
+        pvi->bmiHeader.biCompression = BI_RGB;
+        selectedIsYuy2 = false;
+    } else {
+        pvi->bmiHeader.biBitCount = 16;
+        pvi->bmiHeader.biCompression = MAKEFOURCC('Y','U','Y','2');
+        selectedIsYuy2 = true;
+    }
+    mt.cbFormat = sizeof(VIDEOINFOHEADER);
+
+    hr = g_sampleGrabber->SetMediaType(&mt);
+    if (mt.pbFormat) {
+        CoTaskMemFree(mt.pbFormat);
+    }
+    if (FAILED(hr)) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to set sample grabber media type");
+    }
+
+    hr = g_sampleGrabber->SetBufferSamples(TRUE);
+    if (FAILED(hr)) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to set buffer samples");
+    }
+
+    hr = g_sampleGrabber->SetCallback(&g_callback, 1);
+    if (FAILED(hr)) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to set sample grabber callback");
     }
 
     // Create Null Renderer filter to prevent window from appearing
