@@ -30,6 +30,7 @@
 #include <dvdmedia.h>
 #include <vector>
 #include <cstdlib>
+#include <cstring>
 
 // This is a workaround for the missing header
 // file qedit.h which seems to be absent from the
@@ -71,6 +72,42 @@ static inline unsigned char ClampToByte(int value)
 	if (value < 0) return 0;
 	if (value > 255) return 255;
 	return (unsigned char)value;
+}
+
+void FreeMediaTypeContent(AM_MEDIA_TYPE &mt)
+{
+	if (mt.cbFormat && mt.pbFormat)
+	{
+		CoTaskMemFree(mt.pbFormat);
+		mt.pbFormat = NULL;
+		mt.cbFormat = 0;
+	}
+	if (mt.pUnk)
+	{
+		mt.pUnk->Release();
+		mt.pUnk = NULL;
+	}
+}
+
+void CopyMediaType(AM_MEDIA_TYPE &dest, const AM_MEDIA_TYPE *src)
+{
+	FreeMediaTypeContent(dest);
+	dest = *src;
+	if (src->cbFormat && src->pbFormat)
+	{
+		dest.pbFormat = (BYTE*)CoTaskMemAlloc(src->cbFormat);
+		if (dest.pbFormat)
+		{
+			memcpy(dest.pbFormat, src->pbFormat, src->cbFormat);
+			dest.cbFormat = src->cbFormat;
+		}
+	}
+	else
+	{
+		dest.cbFormat = 0;
+		dest.pbFormat = NULL;
+	}
+	dest.pUnk = NULL;
 }
 
 void exit_message(const char* error_message, int error)
@@ -373,11 +410,78 @@ int main(int argc, char **argv)
 	if (hr != S_OK)
 		exit_message("Could not enable sample buffering in the sample grabber", 1);
 
-	// Set media type in sample grabber filter (YUY2)
+	// Attempt to force the capture pin to YUY2 via IAMStreamConfig
+	IAMStreamConfig *pStreamConfig = NULL;
+	hr = pBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+		pCap, IID_IAMStreamConfig, (void**)&pStreamConfig);
+	GUID selectedSubtype = MEDIASUBTYPE_YUY2;
+	bool selectedIsYuy2 = true;
+	AM_MEDIA_TYPE chosenFormat;
+	ZeroMemory(&chosenFormat, sizeof(chosenFormat));
+	bool hasChosenFormat = false;
+	if (hr == S_OK && pStreamConfig)
+	{
+		int capCount = 0;
+		int capSize = 0;
+		if (SUCCEEDED(pStreamConfig->GetNumberOfCapabilities(&capCount, &capSize)) && capCount > 0)
+		{
+			std::vector<BYTE> capBuffer(capSize);
+			for (int i = 0; i < capCount; ++i)
+			{
+				AM_MEDIA_TYPE *candidate = NULL;
+				if (SUCCEEDED(pStreamConfig->GetStreamCaps(i, &candidate, capBuffer.data())) && candidate)
+				{
+					bool isRgb = (candidate->subtype == MEDIASUBTYPE_RGB24 || candidate->subtype == MEDIASUBTYPE_RGB32);
+					bool isYuy2 = (candidate->subtype == MEDIASUBTYPE_YUY2);
+					bool takeCandidate = false;
+					if (isRgb)
+					{
+						takeCandidate = true;
+						selectedIsYuy2 = false;
+					}
+					else if (!hasChosenFormat && isYuy2)
+					{
+						takeCandidate = true;
+						selectedIsYuy2 = true;
+					}
+					if (takeCandidate)
+					{
+						CopyMediaType(chosenFormat, candidate);
+						hasChosenFormat = true;
+						selectedSubtype = candidate->subtype;
+						if (isRgb)
+						{
+							CoTaskMemFree(candidate->pbFormat);
+							candidate->pbFormat = NULL;
+							CoTaskMemFree(candidate);
+							break;
+						}
+					}
+					if (candidate)
+					{
+						if (candidate->cbFormat && candidate->pbFormat)
+							CoTaskMemFree(candidate->pbFormat);
+						CoTaskMemFree(candidate);
+					}
+				}
+			}
+		}
+		if (hasChosenFormat)
+		{
+			pStreamConfig->SetFormat(&chosenFormat);
+		}
+		pStreamConfig->Release();
+	}
+	if (!hasChosenFormat)
+	{
+		ZeroMemory(&chosenFormat, sizeof(chosenFormat));
+	}
+
+	// Configure sample grabber media type based on selection
 	AM_MEDIA_TYPE mt;
 	ZeroMemory(&mt, sizeof(AM_MEDIA_TYPE));
 	mt.majortype = MEDIATYPE_Video;
-	mt.subtype = MEDIASUBTYPE_YUY2;
+	mt.subtype = selectedSubtype;
 	mt.formattype = FORMAT_VideoInfo;
 	mt.cbFormat = sizeof(VIDEOINFOHEADER);
 	mt.pbFormat = (BYTE*)CoTaskMemAlloc(mt.cbFormat);
@@ -385,13 +489,27 @@ int main(int argc, char **argv)
 		exit_message("Could not allocate media format", 1);
 	ZeroMemory(mt.pbFormat, mt.cbFormat);
 	VIDEOINFOHEADER *pVihStub = (VIDEOINFOHEADER*)mt.pbFormat;
-	pVihStub->AvgTimePerFrame = 333333; // default 30 FPS
+	pVihStub->AvgTimePerFrame = 333333; // ~30 FPS
 	pVihStub->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 	pVihStub->bmiHeader.biPlanes = 1;
-	pVihStub->bmiHeader.biBitCount = 16;
-	pVihStub->bmiHeader.biCompression = MAKEFOURCC('Y','U','Y','2');
-	pVihStub->bmiHeader.biHeight = 0;
-	pVihStub->bmiHeader.biWidth = 0;
+	if (selectedSubtype == MEDIASUBTYPE_RGB32)
+	{
+		pVihStub->bmiHeader.biBitCount = 32;
+		pVihStub->bmiHeader.biCompression = BI_RGB;
+		selectedIsYuy2 = false;
+	}
+	else if (selectedSubtype == MEDIASUBTYPE_RGB24)
+	{
+		pVihStub->bmiHeader.biBitCount = 24;
+		pVihStub->bmiHeader.biCompression = BI_RGB;
+		selectedIsYuy2 = false;
+	}
+	else
+	{
+		pVihStub->bmiHeader.biBitCount = 16;
+		pVihStub->bmiHeader.biCompression = MAKEFOURCC('Y','U','Y','2');
+		selectedIsYuy2 = true;
+	}
 
 	hr = pSampleGrabber->SetMediaType((DexterLib::_AMMediaType *)&mt);
 	if (mt.pbFormat)
@@ -406,31 +524,6 @@ int main(int argc, char **argv)
 	hr = pGraph->AddFilter(pSampleGrabberFilter, L"SampleGrab");
 	if (hr != S_OK)
 		exit_message("Could not add Sample Grabber to filter graph", 1);
-
-	// Attempt to force the capture pin to YUY2 via IAMStreamConfig
-	IAMStreamConfig *pStreamConfig = NULL;
-	hr = pBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-		pCap, IID_IAMStreamConfig, (void**)&pStreamConfig);
-	if (hr == S_OK && pStreamConfig)
-	{
-		AM_MEDIA_TYPE *pCurrent = NULL;
-		if (SUCCEEDED(pStreamConfig->GetFormat(&pCurrent)) && pCurrent)
-		{
-			if (pCurrent->formattype == FORMAT_VideoInfo &&
-				pCurrent->cbFormat >= sizeof(VIDEOINFOHEADER))
-			{
-				VIDEOINFOHEADER *pConfigVih = (VIDEOINFOHEADER*)pCurrent->pbFormat;
-				pConfigVih->bmiHeader.biCompression = MAKEFOURCC('Y','U','Y','2');
-				pConfigVih->bmiHeader.biBitCount = 16;
-			}
-			pCurrent->subtype = MEDIASUBTYPE_YUY2;
-			pStreamConfig->SetFormat(pCurrent);
-			if (pCurrent->cbFormat && pCurrent->pbFormat)
-				CoTaskMemFree(pCurrent->pbFormat);
-			CoTaskMemFree(pCurrent);
-		}
-		pStreamConfig->Release();
-	}
 
 	// Create Null Renderer filter
 	hr = CoCreateInstance(CLSID_NullRenderer, NULL,
