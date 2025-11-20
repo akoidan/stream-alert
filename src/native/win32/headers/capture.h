@@ -5,6 +5,8 @@
 #include <dshow.h>
 #include <vector>
 #include <mutex>
+#include <atomic>
+#include <chrono>
 
 // Import qedit.dll for SampleGrabber interface
 #import "qedit.dll" raw_interfaces_only named_guids
@@ -29,9 +31,15 @@ extern IBaseFilter* g_grabberFilter;
 extern std::vector<uint8_t> g_frameData;
 extern std::mutex g_frameMutex;
 extern bool g_isCapturing;
-
-// Callback reference
+extern bool g_hasMediaInfo;
+extern bool g_captureFormatIsYuy2;
 extern Napi::ThreadSafeFunction g_callbackFunction;
+extern BITMAPINFOHEADER g_bitmapInfoHeader;
+extern int g_frameWidth;
+extern int g_frameHeight;
+extern std::atomic<uint64_t> g_rawSamples;
+extern std::chrono::steady_clock::time_point g_lastCallbackTime;
+extern int g_targetFps;
 
 // Cleanup DirectShow resources
 void CleanupDirectShow();
