@@ -70,6 +70,62 @@ namespace {
         ReleaseCallbackFunction();
         throw Napi::Error::New(env, message);
     }
+
+    IPin* FindPinByDirection(IBaseFilter* filter, PIN_DIRECTION direction) {
+        if (!filter) {
+            return nullptr;
+        }
+
+        IEnumPins* enumPins = nullptr;
+        if (FAILED(filter->EnumPins(&enumPins)) || !enumPins) {
+            return nullptr;
+        }
+
+        IPin* foundPin = nullptr;
+        IPin* pin = nullptr;
+        while (enumPins->Next(1, &pin, nullptr) == S_OK) {
+            PIN_DIRECTION pinDir;
+            if (SUCCEEDED(pin->QueryDirection(&pinDir)) && pinDir == direction) {
+                foundPin = pin;
+                break;
+            }
+            pin->Release();
+        }
+        enumPins->Release();
+        return foundPin;
+    }
+
+    IPin* FindPinByName(IBaseFilter* filter, const std::wstring& targetName) {
+        if (!filter) {
+            return nullptr;
+        }
+
+        IEnumPins* enumPins = nullptr;
+        if (FAILED(filter->EnumPins(&enumPins)) || !enumPins) {
+            return nullptr;
+        }
+
+        IPin* foundPin = nullptr;
+        IPin* pin = nullptr;
+        while (enumPins->Next(1, &pin, nullptr) == S_OK) {
+            PIN_INFO info = {};
+            if (SUCCEEDED(pin->QueryPinInfo(&info))) {
+                std::wstring pinName(info.achName ? info.achName : L"");
+                if (pinName == targetName) {
+                    foundPin = pin;
+                }
+                if (info.pFilter) {
+                    info.pFilter->Release();
+                }
+            }
+            if (foundPin) {
+                break;
+            }
+            pin->Release();
+        }
+        enumPins->Release();
+        return foundPin;
+    }
 }
 
 std::string GuidToString(const GUID& guid) {
@@ -202,13 +258,30 @@ public:
         }
         return E_NOINTERFACE;
     }
-    
-    STDMETHODIMP SampleCB(double /*SampleTime*/, DexterLib::IMediaSample* /*pSample*/) override {
-        return S_OK;
+
+    STDMETHODIMP SampleCB(double sampleTime, DexterLib::IMediaSample* pSample) override {
+        if (!pSample) {
+            return S_OK;
+        }
+
+        BYTE* buffer = nullptr;
+        if (FAILED(pSample->GetPointer(&buffer)) || !buffer) {
+            return S_OK;
+        }
+
+        long actualSize = pSample->GetActualDataLength();
+        return ProcessBuffer(sampleTime, buffer, actualSize);
     }
-    
+
     STDMETHODIMP BufferCB(double sampleTime, BYTE* pBuffer, long bufferLen) override {
+        return ProcessBuffer(sampleTime, pBuffer, bufferLen);
+    }
+
+private:
+    HRESULT ProcessBuffer(double sampleTime, BYTE* pBuffer, long bufferLen) {
         static std::atomic<bool> loggedInactive{false};
+        static std::atomic<bool> loggedNoMediaInfo{false};
+        static std::atomic<bool> loggedEmptySample{false};
 
         if (!pBuffer) {
             return S_OK;
@@ -216,18 +289,37 @@ public:
 
         if (!g_isCapturing) {
             if (!loggedInactive.exchange(true)) {
-                std::cout << "[capture] BufferCB invoked while g_isCapturing=false (dropping frames)" << std::endl;
+                std::cout << "[capture] SampleGrabber invoked while g_isCapturing=false (dropping frames)" << std::endl;
             }
             return S_OK;
         }
 
         auto sampleIndex = ++g_rawSamples;
         if (sampleIndex <= 5) {
-            std::cout << "[capture] BufferCB sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
+            std::cout << "[capture] SampleGrabber sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
                       << ", sampleTime=" << sampleTime << std::endl;
         }
-        
+
         long dataSize = bufferLen;
+
+        if (!g_hasMediaInfo) {
+            if (!loggedNoMediaInfo.exchange(true)) {
+                std::cout << "[capture] SampleGrabber received data before media info configured; dropping sample." << std::endl;
+            }
+            return S_OK;
+        } else {
+            loggedNoMediaInfo.store(false);
+        }
+
+        if (dataSize <= 0) {
+            if (!loggedEmptySample.exchange(true)) {
+                std::cout << "[capture] SampleGrabber reported zero-length sample; waiting for valid buffers." << std::endl;
+            }
+            return S_OK;
+        } else {
+            loggedEmptySample.store(false);
+        }
+
         if (dataSize > 0 && g_hasMediaInfo) {
             BITMAPINFOHEADER infoHeader = g_bitmapInfoHeader;
             const uint8_t* pixelData = pBuffer;
@@ -259,11 +351,11 @@ public:
             std::lock_guard<std::mutex> lock(g_frameMutex);
             g_frameData = bmpData;
 
-            // Frame rate control - only callback at target FPS
             auto now = std::chrono::steady_clock::now();
-            auto interval = std::chrono::milliseconds(1000 / g_targetFps);
+            auto interval = g_targetFps > 0 ? std::chrono::milliseconds(1000 / g_targetFps)
+                                           : std::chrono::milliseconds(0);
 
-            if (now - g_lastCallbackTime >= interval) {
+            if (interval.count() == 0 || now - g_lastCallbackTime >= interval) {
                 g_lastCallbackTime = now;
 
                 if (g_callbackFunction) {
@@ -356,9 +448,14 @@ IBaseFilter* FindCaptureDevice(const std::wstring& deviceName) {
 void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     HRESULT hr;
     
-    // Set target FPS
+    // Set target FPS and initialize callback timer to allow immediate first frame
     g_targetFps = fps;
-    g_lastCallbackTime = std::chrono::steady_clock::now();
+    auto startTime = std::chrono::steady_clock::now();
+    if (g_targetFps > 0) {
+        g_lastCallbackTime = startTime - std::chrono::milliseconds(1000 / g_targetFps);
+    } else {
+        g_lastCallbackTime = startTime;
+    }
     
     // Initialize COM if not already initialized
     hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -441,11 +538,14 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     }
     
     IAMStreamConfig* streamConfig = nullptr;
-    GUID selectedSubtype = MEDIASUBTYPE_RGB24;
-    bool selectedIsYuy2 = false;
+    GUID selectedSubtype = MEDIASUBTYPE_YUY2;
+    bool selectedIsYuy2 = true;
     AM_MEDIA_TYPE chosenFormat;
     ZeroMemory(&chosenFormat, sizeof(chosenFormat));
     bool hasChosenFormat = false;
+    LONG chosenWidth = 0;
+    LONG chosenHeight = 0;
+    LONGLONG chosenAvgTimePerFrame = 0;
 
     hr = captureBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video, g_videoFilter,
                                        IID_IAMStreamConfig, (void**)&streamConfig);
@@ -498,6 +598,23 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
                         CopyMediaType(chosenFormat, mediaType);
                         hasChosenFormat = true;
                         selectedSubtype = mediaType->subtype;
+
+                        if (mediaType->formattype == FORMAT_VideoInfo && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER)) {
+                            auto* candVih = reinterpret_cast<VIDEOINFOHEADER*>(mediaType->pbFormat);
+                            if (candVih) {
+                                chosenWidth = candVih->bmiHeader.biWidth;
+                                chosenHeight = candVih->bmiHeader.biHeight;
+                                chosenAvgTimePerFrame = candVih->AvgTimePerFrame;
+                            }
+                        } else if (mediaType->formattype == FORMAT_VideoInfo2 && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER2)) {
+                            auto* candVih2 = reinterpret_cast<VIDEOINFOHEADER2*>(mediaType->pbFormat);
+                            if (candVih2) {
+                                chosenWidth = candVih2->bmiHeader.biWidth;
+                                chosenHeight = candVih2->bmiHeader.biHeight;
+                                chosenAvgTimePerFrame = candVih2->AvgTimePerFrame;
+                            }
+                        }
+
                         if (isRgb) {
                             if (mediaType->cbFormat && mediaType->pbFormat) {
                                 CoTaskMemFree(mediaType->pbFormat);
@@ -531,12 +648,13 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         if (hasChosenFormat) {
             hr = streamConfig->SetFormat(&chosenFormat);
             if (FAILED(hr)) {
-                FreeMediaTypeContent(chosenFormat);
-                streamConfig->Release();
-                captureBuilder->Release();
-                CleanupDirectShow();
-                ThrowCaptureError(env, "Failed to set capture format");
+                std::cout << "[capture] Warning: IAMStreamConfig::SetFormat failed (hr=" << std::hex << hr
+                          << "), continuing with device default format." << std::endl;
+            } else {
+                std::cout << "[capture] Capture format set successfully (subtype=" << GuidToString(chosenFormat.subtype)
+                          << ")." << std::endl;
             }
+            FreeMediaTypeContent(chosenFormat);
         }
         streamConfig->Release();
     } else {
@@ -557,10 +675,10 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
 
     VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)mt.pbFormat;
-    pvi->AvgTimePerFrame = 10000000LL / fps;
+    pvi->AvgTimePerFrame = chosenAvgTimePerFrame > 0 ? chosenAvgTimePerFrame : 10000000LL / fps;
     pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    pvi->bmiHeader.biWidth = 0;
-    pvi->bmiHeader.biHeight = 0;
+    pvi->bmiHeader.biWidth = chosenWidth;
+    pvi->bmiHeader.biHeight = chosenHeight;
     pvi->bmiHeader.biPlanes = 1;
     if (selectedSubtype == MEDIASUBTYPE_RGB32) {
         pvi->bmiHeader.biBitCount = 32;
@@ -587,6 +705,8 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         ThrowCaptureError(env, "Failed to set sample grabber media type");
     }
 
+    g_captureFormatIsYuy2 = selectedIsYuy2;
+
     hr = g_sampleGrabber->SetBufferSamples(TRUE);
     if (FAILED(hr)) {
         captureBuilder->Release();
@@ -594,64 +714,143 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
         ThrowCaptureError(env, "Failed to set buffer samples");
     }
 
-    hr = g_sampleGrabber->SetCallback(&g_callback, 1);
+    hr = g_sampleGrabber->SetOneShot(FALSE);
+    if (FAILED(hr)) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to disable one-shot mode");
+    }
+
+    hr = g_sampleGrabber->SetCallback(&g_callback, 0);
+    if (FAILED(hr)) {
+        std::cout << "[capture] SampleCB registration failed (hr=" << std::hex << hr
+                  << "), retrying BufferCB." << std::endl;
+        hr = g_sampleGrabber->SetCallback(&g_callback, 1);
+    }
     if (FAILED(hr)) {
         captureBuilder->Release();
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to set sample grabber callback");
     }
 
-    // Create Null Renderer filter to prevent window from appearing
+    // Insert Smart Tee filter to provide both capture and preview branches
+    IBaseFilter* smartTeeFilter = nullptr;
+    hr = CoCreateInstance(CLSID_SmartTee, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_IBaseFilter, (void**)&smartTeeFilter);
+    if (FAILED(hr)) {
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to create smart tee filter");
+    }
+
+    hr = g_graphBuilder->AddFilter(smartTeeFilter, L"Smart Tee");
+    if (FAILED(hr)) {
+        smartTeeFilter->Release();
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to add smart tee filter to graph");
+    }
+
+    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+                                      g_videoFilter, nullptr, smartTeeFilter);
+    if (FAILED(hr)) {
+        std::cout << "[capture] Failed to route capture pin into smart tee (hr=" << std::hex << hr << ")" << std::endl;
+        smartTeeFilter->Release();
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to connect smart tee input");
+    }
+
+    // Create Null Renderer filter to prevent window from appearing on capture branch
     IBaseFilter* nullRenderer = nullptr;
     hr = CoCreateInstance(CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
                          IID_IBaseFilter, (void**)&nullRenderer);
     if (FAILED(hr)) {
+        smartTeeFilter->Release();
         captureBuilder->Release();
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to create null renderer");
     }
     
-    // Add null renderer to graph
     hr = g_graphBuilder->AddFilter(nullRenderer, L"Null Renderer");
     if (FAILED(hr)) {
         nullRenderer->Release();
+        smartTeeFilter->Release();
         captureBuilder->Release();
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to add null renderer to graph");
     }
-    
-    // Connect the filters - capture -> sample grabber -> null renderer (no window)
-    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                      g_videoFilter, g_grabberFilter, nullRenderer);
-    if (FAILED(hr)) {
-        std::cout << "[capture] Failed to connect capture pin (hr=" << std::hex << hr << ")" << std::endl;
+
+    // Manually connect Smart Tee capture pin -> Sample Grabber -> Null Renderer
+    IPin* smartCapturePin = FindPinByName(smartTeeFilter, L"Capture");
+    IPin* sampleGrabberInput = FindPinByDirection(g_grabberFilter, PINDIR_INPUT);
+    IPin* sampleGrabberOutput = FindPinByDirection(g_grabberFilter, PINDIR_OUTPUT);
+    IPin* nullRendererInput = FindPinByDirection(nullRenderer, PINDIR_INPUT);
+
+    if (!smartCapturePin || !sampleGrabberInput || !sampleGrabberOutput || !nullRendererInput) {
+        if (smartCapturePin) smartCapturePin->Release();
+        if (sampleGrabberInput) sampleGrabberInput->Release();
+        if (sampleGrabberOutput) sampleGrabberOutput->Release();
+        if (nullRendererInput) nullRendererInput->Release();
         nullRenderer->Release();
+        smartTeeFilter->Release();
         captureBuilder->Release();
         CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect capture stream");
-    } else {
-        std::cout << "[capture] Capture pin connected." << std::endl;
+        ThrowCaptureError(env, "Failed to enumerate pins for smart tee capture branch");
     }
-    
-    // Release null renderer (graph maintains reference)
+
+    hr = g_graphBuilder->Connect(smartCapturePin, sampleGrabberInput);
+    smartCapturePin->Release();
+    sampleGrabberInput->Release();
+    if (FAILED(hr)) {
+        sampleGrabberOutput->Release();
+        nullRendererInput->Release();
+        nullRenderer->Release();
+        smartTeeFilter->Release();
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to connect smart tee capture pin to sample grabber");
+    }
+
+    hr = g_graphBuilder->Connect(sampleGrabberOutput, nullRendererInput);
+    sampleGrabberOutput->Release();
+    nullRendererInput->Release();
+    if (FAILED(hr)) {
+        nullRenderer->Release();
+        smartTeeFilter->Release();
+        captureBuilder->Release();
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to connect sample grabber to null renderer");
+    }
+
     nullRenderer->Release();
 
-    // Optionally connect preview pin to a null renderer to satisfy devices that expect it
+    // Connect Smart Tee preview branch to satisfy devices like OBS Virtual Camera
     IBaseFilter* previewNullRenderer = nullptr;
     hr = CoCreateInstance(CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
                          IID_IBaseFilter, (void**)&previewNullRenderer);
     if (SUCCEEDED(hr)) {
-        HRESULT previewHr = captureBuilder->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video,
-                                                         g_videoFilter, nullptr, previewNullRenderer);
-        if (SUCCEEDED(previewHr)) {
-            std::cout << "[capture] Preview pin connected to null renderer." << std::endl;
+        IPin* smartPreviewPin = FindPinByName(smartTeeFilter, L"Preview");
+        IPin* previewInput = FindPinByDirection(previewNullRenderer, PINDIR_INPUT);
+        if (smartPreviewPin && previewInput) {
+            HRESULT previewHr = g_graphBuilder->Connect(smartPreviewPin, previewInput);
+            if (SUCCEEDED(previewHr)) {
+                std::cout << "[capture] Preview branch connected via smart tee." << std::endl;
+            } else {
+                std::cout << "[capture] Preview branch connection failed (hr=" << std::hex << previewHr << ")" << std::endl;
+            }
         } else {
-            std::cout << "[capture] Preview pin connection failed (hr=" << std::hex << previewHr << ")" << std::endl;
+            std::cout << "[capture] Failed to enumerate pins for preview branch." << std::endl;
         }
+        if (smartPreviewPin) smartPreviewPin->Release();
+        if (previewInput) previewInput->Release();
         previewNullRenderer->Release();
     } else {
         std::cout << "[capture] Failed to create preview null renderer (hr=" << std::hex << hr << ")" << std::endl;
     }
+
+    // Smart tee reference now held by graph
+    smartTeeFilter->Release();
     
     // Release capture graph builder
     captureBuilder->Release();
@@ -661,8 +860,20 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     if (FAILED(hr)) {
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to run graph");
+    } else {
+        std::cout << "[capture] Graph run request succeeded." << std::endl;
     }
-    
+
+    OAFilterState graphState = State_Stopped;
+    HRESULT stateHr = g_mediaControl->GetState(5000, &graphState);
+    if (SUCCEEDED(stateHr)) {
+        const char* stateStr = graphState == State_Running ? "Running"
+                              : graphState == State_Paused ? "Paused" : "Stopped";
+        std::cout << "[capture] Graph state after Run(): " << stateStr << std::endl;
+    } else {
+        std::cout << "[capture] GetState after Run failed (hr=" << std::hex << stateHr << std::dec << ")." << std::endl;
+    }
+
     // Get the actual media type to extract frame dimensions
     DexterLib::_AMMediaType connectedMt;
     hr = g_sampleGrabber->GetConnectedMediaType(&connectedMt);
