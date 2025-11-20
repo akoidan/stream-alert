@@ -32,7 +32,7 @@ void ConfigureBitmapInfo(const BITMAPINFOHEADER& header, DWORD imageSize) {
     g_bitmapInfoHeader = {};
     g_bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
     g_bitmapInfoHeader.biWidth = header.biWidth;
-    g_bitmapInfoHeader.biHeight = header.biHeight;
+    g_bitmapInfoHeader.biHeight = -header.biHeight; // Negative height for top-down bitmap
     g_bitmapInfoHeader.biPlanes = 1;
     g_bitmapInfoHeader.biBitCount = header.biBitCount ? header.biBitCount : 24;
     g_bitmapInfoHeader.biCompression = header.biCompression;
