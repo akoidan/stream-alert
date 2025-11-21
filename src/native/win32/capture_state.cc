@@ -1,4 +1,6 @@
 #include "headers/capture_state.h"
+#include <Windows.h>
+#include <iostream>
 
 IGraphBuilder* g_graphBuilder = nullptr;
 IMediaControl* g_mediaControl = nullptr;
@@ -59,14 +61,42 @@ void ResetFrameMetadata() {
 }
 
 void CleanupDirectShow() {
+    std::cout << "[capture] Starting DirectShow cleanup..." << std::endl;
+    
     if (g_mediaControl) {
-        g_mediaControl->Stop();
+        HRESULT hr = g_mediaControl->Stop();
+        std::cout << "[capture] MediaControl::Stop() returned hr=" << std::hex << hr << std::dec << std::endl;
+        
+        // Wait for the graph to actually stop with longer timeout
+        OAFilterState state = State_Running;
+        int attempts = 0;
+        while (state != State_Stopped && attempts < 50) {
+            hr = g_mediaControl->GetState(200, &state);
+            if (SUCCEEDED(hr)) {
+                std::cout << "[capture] Graph state check " << attempts << ": " << state << std::endl;
+            }
+            attempts++;
+        }
+        
+        if (state == State_Stopped) {
+            std::cout << "[capture] Graph successfully stopped after " << attempts << " attempts." << std::endl;
+        } else {
+            std::cout << "[capture] Warning: Graph did not stop cleanly, final state: " << state << std::endl;
+        }
     }
+    
+    // Add a longer delay to allow OBS Virtual Camera to release completely
+    Sleep(500);
+    
     ReleaseComPtr(g_mediaControl);
     ReleaseComPtr(g_graphBuilder);
     ReleaseComPtr(g_videoFilter);
     ReleaseComPtr(g_sampleGrabber);
     ReleaseComPtr(g_grabberFilter);
     ResetFrameMetadata();
-    CoUninitialize();
+    
+    // Additional delay to ensure OBS Virtual Camera is fully released
+    Sleep(200);
+    
+    std::cout << "[capture] DirectShow cleanup completed." << std::endl;
 }

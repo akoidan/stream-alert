@@ -18,14 +18,6 @@ namespace {
     throw Napi::Error::New(env, message);
 }
 
-void EnsureComInitialized(Napi::Env env) {
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    if (hr == S_OK || hr == S_FALSE || hr == RPC_E_CHANGED_MODE) {
-        return;
-    }
-    ThrowCaptureError(env, "Failed to initialize COM");
-}
-
 std::wstring ToWide(const std::string& value) {
     return std::wstring(value.begin(), value.end());
 }
@@ -141,6 +133,7 @@ void ConfigureSampleGrabberMediaType(Napi::Env env, const CaptureFormatSelection
 }
 
 void ConfigureSampleGrabberOptions(Napi::Env env) {
+    // Try FFmpeg-like settings
     HRESULT hr = g_sampleGrabber->SetBufferSamples(TRUE);
     if (FAILED(hr)) {
         CleanupDirectShow();
@@ -152,6 +145,9 @@ void ConfigureSampleGrabberOptions(Napi::Env env) {
         CleanupDirectShow();
         ThrowCaptureError(env, "Failed to disable one-shot mode");
     }
+    
+    // Add this - FFmpeg might use different callback methods
+    std::cout << "[capture] SampleGrabber configured with buffer samples=TRUE, one-shot=FALSE" << std::endl;
 }
 
 void RegisterSampleCallback(Napi::Env env) {
@@ -377,7 +373,6 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     ResetFrameMetadata();
     g_isCapturing = false;
 
-    EnsureComInitialized(env);
     InitializeGraphBuilder(env);
 
     std::wstring deviceNameW = ToWide(deviceName);
