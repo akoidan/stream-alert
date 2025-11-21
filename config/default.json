@@ -5,7 +5,7 @@
     "spamDelay": 10000,
     "message": "Changes detected"
   },
-  "camera": "Logitech BRIO",
+  "camera": "OBS Virtual Camera",
   "frameRate": 1,
   "diffThreshold": 1000,
   "threshold": 0.2
