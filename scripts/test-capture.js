@@ -4,7 +4,7 @@ const bindings = require('bindings');
 
 const deviceName = process.argv[2] || 'OBS Virtual Camera';
 const fps = Number(process.argv[3] || 1);
-const durationSeconds = Number(process.argv[4] || 5);
+const durationSeconds = Number(process.argv[4] || 10);
 
 if (!fps || fps <= 0) {
   console.error('FPS must be a positive number.');
