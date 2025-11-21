@@ -281,6 +281,18 @@ void ConnectSmartTeePreviewBranch(IBaseFilter* smartTeeFilter) {
     previewSink->Release();
 }
 
+void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
+    HRESULT hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+                                              g_videoFilter, g_grabberFilter, nullptr);
+    
+    if (FAILED(hr)) {
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to connect direct pipeline");
+    }
+    
+    std::cout << "[capture] Direct pipeline connected (no smart tee, no renderer)." << std::endl;
+}
+
 void ConfigureSmartTeePipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
     IBaseFilter* smartTeeFilter = CreateAndAddFilter(env, CLSID_SmartTee, L"Smart Tee", "smart tee filter");
 
@@ -374,7 +386,7 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     ICaptureGraphBuilder2* captureBuilder = CreateCaptureGraphBuilder(env);
     AddSampleGrabberFilter(env);
     ConfigureStreamFormat(env, captureBuilder, fps);
-    ConfigureSmartTeePipeline(env, captureBuilder);
+    ConfigureDirectPipeline(env, captureBuilder);
     captureBuilder->Release();
 
     StartGraphOrThrow(env);
