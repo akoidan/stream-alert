@@ -18,6 +18,8 @@ import {NestFactory} from '@nestjs/core';
 // Load configuration directly
 const configPath = join(process.env.NODE_CONFIG_TS_DIR, 'default.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+console.log(`Config path ${configPath}`)
+console.log(`Config  ${config}`)
 
 // Bootstrap function that handles configuration
 async function bootstrap() {
