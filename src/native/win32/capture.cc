@@ -278,15 +278,41 @@ void ConnectSmartTeePreviewBranch(IBaseFilter* smartTeeFilter) {
 }
 
 void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
-    HRESULT hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                              g_videoFilter, g_grabberFilter, nullptr);
+    // Configure video window to be hidden before connecting
+    IVideoWindow* videoWindow = nullptr;
+    HRESULT hr = g_graphBuilder->QueryInterface(IID_IVideoWindow, reinterpret_cast<void**>(&videoWindow));
+    if (SUCCEEDED(hr) && videoWindow) {
+        videoWindow->put_AutoShow(OAFALSE);
+        videoWindow->put_Visible(OAFALSE);
+        videoWindow->put_Caption(L"Hidden");
+        videoWindow->Release();
+        std::cout << "[capture] Video window configured to be hidden." << std::endl;
+    }
+    
+    // Try direct connection first (this was giving better results)
+    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+                                      g_videoFilter, g_grabberFilter, nullptr);
+    
+    if (SUCCEEDED(hr)) {
+        std::cout << "[capture] Direct pipeline connected (no renderer)." << std::endl;
+        return;
+    }
+    
+    // If direct fails, fallback to Null Renderer
+    std::cout << "[capture] Direct connection failed, trying with Null Renderer (hr=" 
+              << std::hex << hr << std::dec << ")" << std::endl;
+    
+    IBaseFilter* nullRenderer = CreateAndAddFilter(env, CLSID_NullRenderer, L"Null Renderer", "null renderer");
+    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
+                                      g_videoFilter, g_grabberFilter, nullRenderer);
+    nullRenderer->Release();
     
     if (FAILED(hr)) {
         CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect direct pipeline");
+        ThrowCaptureError(env, "Failed to connect pipeline with both approaches");
     }
     
-    std::cout << "[capture] Direct pipeline connected (no smart tee, no renderer)." << std::endl;
+    std::cout << "[capture] Pipeline connected with Null Renderer (fallback)." << std::endl;
 }
 
 void ConfigureSmartTeePipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
