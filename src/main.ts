@@ -3,7 +3,6 @@ import {CustomLogger} from '@/app/custom-logger';
 import * as process from 'node:process';
 import {AppModule} from "@/app/app-module";
 
-
 const customLogger = new CustomLogger();
 NestFactory.createApplicationContext(AppModule, {
   logger: customLogger,
