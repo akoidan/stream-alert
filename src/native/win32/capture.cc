@@ -12,6 +12,8 @@
 
 #pragma comment(lib, "strmiids.lib")
 
+static bool g_comInitialized = false;
+
 namespace {
 
 [[noreturn]] void ThrowCaptureError(Napi::Env env, const char* message) {
@@ -291,6 +293,27 @@ void CacheConnectedMediaTypeOrThrow(Napi::Env env) {
 
 } // namespace
 
+// COM initialization and cleanup functions
+void InitializeCOM() {
+    if (!g_comInitialized) {
+        HRESULT hr = CoInitialize(0);
+        if (hr == S_OK || hr == S_FALSE) {
+            g_comInitialized = true;
+            std::cout << "[capture] COM initialized with CoInitialize(0) like FFmpeg." << std::endl;
+        } else {
+            std::cout << "[capture] Failed to initialize COM (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+        }
+    }
+}
+
+void CleanupCOM() {
+    if (g_comInitialized) {
+        CoUninitialize();
+        g_comInitialized = false;
+        std::cout << "[capture] COM uninitialized at module cleanup." << std::endl;
+    }
+}
+
 // Sample grabber callback is implemented in capture_callback.cc
 
 // Initialize DirectShow and start capture
@@ -328,6 +351,7 @@ void StopCapture() {
     }
     
     CleanupDirectShow();
+    CleanupCOM();
 }
 
 // N-API functions
@@ -391,10 +415,15 @@ namespace Capture {
 }
 
 // Initialize module
-Napi::Object InitCapture(Napi::Env env, Napi::Object exports) {
+namespace Capture {
+Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    // Initialize COM like FFmpeg does - CoInitialize(0)
+    InitializeCOM();
+    
     exports.Set(Napi::String::New(env, "start"), Napi::Function::New(env, Capture::Start));
     exports.Set(Napi::String::New(env, "stop"), Napi::Function::New(env, Capture::Stop));
     exports.Set(Napi::String::New(env, "getFrame"), Napi::Function::New(env, Capture::GetFrame));
     
     return exports;
+}
 }

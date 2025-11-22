@@ -44,6 +44,10 @@ extern int g_targetFps;
 // Cleanup DirectShow resources
 void CleanupDirectShow();
 
+// COM initialization and cleanup functions
+void InitializeCOM();
+void CleanupCOM();
+
 // Initialize DirectShow and start capture
 void StartCapture(Napi::Env env, const std::string& deviceName, int fps);
 
@@ -52,6 +56,9 @@ void StopCapture();
 
 // N-API functions
 namespace Capture {
+    // Initialize capture module
+    Napi::Object Init(Napi::Env env, Napi::Object exports);
+    
     // Start capture with device name, fps, and callback
     Napi::Value Start(const Napi::CallbackInfo& info);
     
@@ -61,6 +68,3 @@ namespace Capture {
     // Get latest frame
     Napi::Value GetFrame(const Napi::CallbackInfo& info);
 }
-
-// Initialize module
-Napi::Object InitCapture(Napi::Env env, Napi::Object exports);
