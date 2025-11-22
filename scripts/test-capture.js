@@ -51,7 +51,7 @@ process.on('SIGINT', () => {
   shutdown();
 });
 
-capture.start(deviceName, fps, (frame) => {
+capture.start(deviceName, fps, (frameData) => {
   const now = Date.now();
   frameCount += 1;
 
@@ -60,11 +60,14 @@ capture.start(deviceName, fps, (frame) => {
   }
   lastCallbackTs = now;
 
-  if (!savedPath && frame && frame.data) {
-    fs.writeFileSync(outputPath, frame.data);
+  // frameData is now FrameData object: { buffer: Buffer, width: number, height: number }
+  if (!savedPath && frameData && frameData.buffer) {
+    fs.writeFileSync(outputPath, frameData.buffer);
     savedPath = outputPath;
     console.log(`Saved initial frame to ${savedPath}`);
+    console.log(`Frame dimensions: ${frameData.width}x${frameData.height}`);
+    console.log(`Buffer size: ${frameData.buffer.length} bytes`);
   }
 
-  console.log(`Frame #${frameCount} (${frame.dataSize} bytes)`);
+  console.log(`Frame #${frameCount} (${frameData ? frameData.buffer?.length || 0 : 0} bytes, ${frameData ? `${frameData.width}x${frameData.height}` : 'N/A'})`);
 });
