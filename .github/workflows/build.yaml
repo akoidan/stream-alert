@@ -10,6 +10,32 @@ on:
         required: true
 
 jobs:
+  create_release:
+    runs-on: ubuntu-22.04
+    permissions: write-all
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Set Short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Set Release Name from Input
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" >> $GITHUB_ENV
+
+      - name: Set Release Name for Push Trigger
+        if: github.event_name == 'push'
+        run: echo "RELEASE_NAME=${{ env.SHORT_SHA }}" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RELEASE_NAME }}
+          release_name: ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
   win32:
     runs-on: windows-2022
     permissions: write-all
