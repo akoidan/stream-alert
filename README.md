@@ -51,9 +51,14 @@ Config file is located at src/config/default.json, or you can use src/config/use
 -  `frameRate` - how often (time a seconds) check the difference for the video frames, 1 = 1 frame a second,
 
 
-### Build and run 
+### Running locally  
 - `nvm use 20`
 - run `yarn` to install dependencies 
 - run `yarn build` to build native module
 - run `yarn start` to start the process. Note that only 1 process can be running at the same time, due to 1 TG bot restriction
 
+### Build windows executable file
+ - `yarn cmake` - builds node native modules to `build/Debug/native.node`
+ - `yarn nest` - converts typescript into cjs while preserving nestjs decorators. Outputs it to `dist` directory
+ - `yarn esbuild` - bundles main file `dist/sea.js` with all its' dependency tree into `dist/sea-bundle.js`. Note esbuild doesn't work with nestjs decorators, so nestjs build is required on top
+ - `yarn native` - Creates dist/stream-alert.exe from dist/sea-bundle.js and other files specified in sea-config.json

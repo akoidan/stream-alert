@@ -11,5 +11,8 @@ export interface IConfigResolver {
   getDiffConfig(): Diff;
   getCameraConfig(): Camera;
 }
+export interface GlobalSeaConf {
+  data: IConfig;
+}
 
-export const globalSeaConf: IConfig = {} as any;
+export const globalSeaConf: GlobalSeaConf = {data: {}} as any;

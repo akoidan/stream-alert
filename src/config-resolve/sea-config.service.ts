@@ -1,26 +1,28 @@
 import {Injectable} from '@nestjs/common';
-import {globalSeaConf, IConfigResolver} from "@/config-resolve/config-resolve-model";
-import {Camera, Diff, IConfig, Telegram} from "node-ts-config";
+import {GlobalSeaConf, IConfigResolver} from "@/config-resolve/config-resolve-model";
+import {Camera, Diff, Telegram} from "node-ts-config";
 
 @Injectable()
 export class SeaConfigService implements IConfigResolver{
-  private config: IConfig = null!;
+  constructor(private readonly globalSeaConf: GlobalSeaConf) {
+  }
+
 
   public load() {
-    if (!globalSeaConf.camera) {
+    if (!this.globalSeaConf.data.camera) {
       throw new Error("Sea has not been populated");
     }
   }
 
   public getTGConfig(): Telegram {
-    return globalSeaConf.telegram;
+    return this.globalSeaConf.data.telegram;
   }
 
   public getDiffConfig(): Diff {
-    return globalSeaConf.diff;
+    return this.globalSeaConf.data.diff;
   }
 
   public getCameraConfig(): Camera {
-    return globalSeaConf.camera;
+    return this.globalSeaConf.data.camera;
   }
 }

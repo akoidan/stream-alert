@@ -4,6 +4,7 @@ import {
   CameraConf,
   ConfigResolver,
   DiffConf,
+  globalSeaConf,
   IConfigResolver,
   TelegramConfig
 } from "@/config-resolve/config-resolve-model";
@@ -15,7 +16,10 @@ import {NodeTsConfigService} from "@/config-resolve/node-ts-config.service";
   exports: [TelegramConfig, CameraConf, DiffConf],
   providers: [
     Logger,
-    SeaConfigService,
+    {
+      provide: SeaConfigService,
+      useFactory: () => new SeaConfigService(globalSeaConf),
+    },
     NodeTsConfigService,
     {
       provide: ConfigResolver,
