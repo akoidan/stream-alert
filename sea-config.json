@@ -1,5 +1,5 @@
 {
-  "main": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\main-vite.js",
+  "main": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\sea-bundle.js",
   "output": "sea-prep.blob",
   "assets": {
     "build-Debug-native-node": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\build\\Debug\\native.node",
