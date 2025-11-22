@@ -4,6 +4,7 @@ yarn-error.log*
 .DS_Store
 .idea
 src/config/user
+sea-assets
 /build
 .vscode/*
 .vs
@@ -13,3 +14,9 @@ out
 /scripts/commandcam.exe
 /scripts/commandcam.obj
 /scripts/qedit.tlh
+
+# SEA (Single Executable Application) build artifacts
+*.exe
+sea-*.json
+sea-*.js
+sea-*.blob
