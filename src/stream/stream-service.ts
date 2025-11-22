@@ -24,7 +24,7 @@ export class StreamService {
       const frameData = this.captureService.getFrame();
       if (frameData) {
         process.stdout.write(".");
-        await frameListener.onNewFrame(frameData as Buffer<ArrayBuffer>);
+        await frameListener.onNewFrame(frameData);
       }
     });
     this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);

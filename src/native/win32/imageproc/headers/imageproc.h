@@ -12,11 +12,9 @@ struct SimpleImage {
 };
 
 namespace ImageProc {
-    // Convert BMP buffer to JPEG buffer
-    Napi::Value ConvertBmpToJpeg(const Napi::CallbackInfo& info);
-    
-    // Compare two BMP images and return number of different pixels
-    Napi::Value CompareBmpImages(const Napi::CallbackInfo& info);
+    // High-Performance RGB Functions
+    Napi::Value ConvertRgbToJpeg(const Napi::CallbackInfo& info);
+    Napi::Value CompareRgbImages(const Napi::CallbackInfo& info);
     
     // Initialize image processor module
     Napi::Object Init(Napi::Env env, Napi::Object exports);

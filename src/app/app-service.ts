@@ -5,6 +5,7 @@ import {StreamService} from "@/stream/stream-service";
 import type {GlobalService} from "@/app/app-model";
 import {CommandContextExtn} from "telegraf/typings/telegram-types";
 import {TelegramCommands} from "@/telegram/telegram-model";
+import {FrameData} from "@/native/native-model";
 
 @Injectable()
 export class AppService implements GlobalService {
@@ -47,7 +48,7 @@ export class AppService implements GlobalService {
     }
   }
 
-  public async onNewFrame(frameData: Buffer<ArrayBuffer>) {
+  public async onNewFrame(frameData: FrameData) {
     const image = await this.im.getImageIfItsChanged(frameData);
     if (image) {
       await this.telegram.sendImage(image);

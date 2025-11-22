@@ -1,10 +1,10 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {INativeModule} from '@/native/native-model';
+import {FrameData, INativeModule} from '@/native/native-model';
 
 
 @Injectable()
 export class ImagelibService {
-  private oldFrame: Buffer | null = null;
+  private oldFrame: FrameData | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -19,14 +19,14 @@ export class ImagelibService {
       return null;
     }
 
-    console.time("nativeConvertBmpToJpeg");
-    const result = this.native.convertBmpToJpeg(this.oldFrame);
-    console.timeEnd("nativeConvertBmpToJpeg");
+    console.time("convertRgbToJpeg");
+    const result = this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
+    console.timeEnd("convertRgbToJpeg");
     return result;
   }
 
-  async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
-    if (!frameData || frameData.length === 0) {
+  async getImageIfItsChanged(frameData: FrameData): Promise<Buffer | null> {
+    if (!frameData || !frameData.buffer || frameData.buffer.length === 0) {
       return null;
     }
 
@@ -35,17 +35,25 @@ export class ImagelibService {
       return null;
     }
 
-    console.time("compareBmpImages");
-    const diffPixels = this.native.compareBmpImages(this.oldFrame, frameData, this.threshold);
-    console.timeEnd("compareBmpImages");
+    console.time("compareRgbImages");
+    const diffPixels = this.native.compareRgbImages(
+      this.oldFrame.buffer, 
+      frameData.buffer, 
+      frameData.width, 
+      frameData.height, 
+      this.threshold
+    );
+    console.timeEnd("compareRgbImages");
+    
     if (diffPixels < this.diffThreshold) {
-      return null
+      return null;
     }
+    
     this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
 
-    console.time("convertBmpToJpeg");
-    const jpegBuffer = this.native.convertBmpToJpeg(frameData);
-    console.timeEnd("convertBmpToJpeg");
+    console.time("convertRgbToJpeg");
+    const jpegBuffer = this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);
+    console.timeEnd("convertRgbToJpeg");
 
     this.oldFrame = frameData;
     return jpegBuffer;

@@ -1,3 +1,9 @@
+interface FrameData {
+  buffer: Buffer;
+  width: number;
+  height: number;
+}
+
 interface INativeModule {
   /**
    * Starts video capture with callback
@@ -14,27 +20,32 @@ interface INativeModule {
 
   /**
    * Gets the latest captured frame
-   * @returns Buffer containing JPEG frame data, or null if no frame available
+   * @returns FrameData object with RGB buffer and dimensions, or null if no frame available
    */
-  getFrame(): Buffer | null;
+  getFrame(): FrameData | null;
 
+  // High-Performance RGB Functions
   /**
-   * Convert BMP image buffer to JPEG buffer
-   * @param bmpBuffer - Buffer containing BMP image data (24-bit format)
+   * Convert RGB image buffer to JPEG buffer
+   * @param rgbBuffer - Buffer containing RGB image data
+   * @param width - Image width in pixels
+   * @param height - Image height in pixels
    * @returns Buffer containing JPEG data
    * @throws Error if conversion fails
    */
-  convertBmpToJpeg(bmpBuffer: Buffer): Buffer;
+  convertRgbToJpeg(rgbBuffer: Buffer, width: number, height: number): Buffer;
 
   /**
-   * Compare two BMP images and count different pixels
-   * @param bmpBuffer1 - Buffer containing first BMP image data
-   * @param bmpBuffer2 - Buffer containing second BMP image data
+   * Compare two RGB images and count different pixels
+   * @param rgbBuffer1 - Buffer containing first RGB image data
+   * @param rgbBuffer2 - Buffer containing second RGB image data
+   * @param width - Image width in pixels
+   * @param height - Image height in pixels
    * @param threshold - Threshold for pixel difference (0-1, similar to pixelmatch)
    * @returns Number of different pixels
    * @throws Error if comparison fails
    */
-  compareBmpImages(bmpBuffer1: Buffer, bmpBuffer2: Buffer, threshold: number): number;
+  compareRgbImages(rgbBuffer1: Buffer, rgbBuffer2: Buffer, width: number, height: number, threshold: number): number;
 
   // loaded by nodejs
   path: string;
@@ -44,5 +55,6 @@ export const Native = 'Native';
 
 export type {
   INativeModule,
+  FrameData,
 };
 
