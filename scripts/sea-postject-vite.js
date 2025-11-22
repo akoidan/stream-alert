@@ -36,4 +36,4 @@ try {
   process.exit(1);
 }
 
-console.log('The dist-vite folder contains the bundled assets and should be distributed with the executable');
+console.log('The dist folder contains the bundled assets and should be distributed with the executable');

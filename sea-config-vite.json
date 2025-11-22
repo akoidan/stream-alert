@@ -1,7 +1,4 @@
 {
-  "main": "dist-vite/bundle.js",
-  "output": "sea-prep-vite.blob",
-  "assets": {
-    "dist-vite/**/*": true
-  }
+  "main": "dist/bundle.js",
+  "output": "sea-prep-vite.blob"
 }

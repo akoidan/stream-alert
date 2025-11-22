@@ -1,16 +1,16 @@
 {
   "telegram": {
-    "token": "@@TG_TOKEN",
-    "chatId": "@@TG_CHAT_ID",
+    "token": "123",
+    "chatId": 2,
     "spamDelay": 10000,
     "message": "Changes detected"
   },
   "camera": {
-    "name": "@@CAMERA_NAME",
+    "name": "OBS Virtual Camera",
     "frameRate": 1
   },
   "diff": {
     "pixels": 1000,
-    "threshold": 0.0
+    "threshold": 0
   }
 }

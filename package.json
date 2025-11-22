@@ -8,8 +8,8 @@
     "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
     "cmake": "cmake-js build --debug",
-    "vite": "npm-run-all -s cmake && yarn vite build && node scripts/build-vite.js",
-    "build": "npm-run-all -s cmake && yarn vite build && native",
+    "vite": "vite build",
+    "build": "npm-run-all -s cmake vite native",
     "native": "node --experimental-sea-config sea-config-vite.json && node scripts/sea-postject-vite.js"
   },
   "engines": {
