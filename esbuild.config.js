@@ -38,24 +38,4 @@ require('reflect-metadata');
     },
   ],
   logLevel: 'info'
-}).then(() => {
-  // Copy assets to dist
-  const nativeSrc = resolve(__dirname, 'build', 'Debug', 'native.node');
-  const nativeDest = resolve(__dirname, 'dist', 'build', 'Debug', 'native.node');
-  const configSrc = resolve(__dirname, 'config', 'default.json');
-  const configDest = resolve(__dirname, 'dist', 'config', 'default.json');
-
-  // Create directories
-  fs.mkdirSync(resolve(__dirname, 'dist', 'build', 'Debug'), {recursive: true});
-  fs.mkdirSync(resolve(__dirname, 'dist', 'config'), {recursive: true});
-
-  // Copy files
-  if (fs.existsSync(nativeSrc)) {
-    fs.copyFileSync(nativeSrc, nativeDest);
-    console.log('Copied native.node');
-  }
-  if (fs.existsSync(configSrc)) {
-    fs.copyFileSync(configSrc, configDest);
-    console.log('Copied default.json');
-  }
 }).catch(() => process.exit(1));

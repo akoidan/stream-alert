@@ -3,7 +3,7 @@
   "sourceRoot": "src",
   "entryFile": "sea",
   "compilerOptions": {
-    "assets": ["**/*.node", "config/default.json"],
+    "assets": ["../build/Debug/native.node", "config/default.json"],
     "deleteOutDir": true,
     "watchAssets": true
   }
