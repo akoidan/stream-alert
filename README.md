@@ -19,6 +19,7 @@ You need either real physical webcamera or some virtual webcamera
 
 #### Web camera
 For real physical web camera specify its name in `src/config/default.json` at path `camera`.
+You can get the camera name from any software that read camera. E.g. you join https://meet.google.com/ create an instanc call, go to settings -> video and check camera list
 
 #### OBS Virtual camera
 For screen capture you need OBS with streaming as a camera feature
