@@ -19,13 +19,6 @@ import {NativeModule} from "@/native/native-module";
   ],
   exports: [ImagelibService]
 })
-export class ImagelibModule implements OnModuleInit {
-
-  constructor(private readonly service: ImagelibService) {
-  }
-
-  onModuleInit() {
-    this.service.initializeProcessor();
-  }
+export class ImagelibModule {
 
 }

@@ -19,22 +19,22 @@ interface INativeModule {
   getFrame(): Buffer | null;
 
   /**
-   * Initialize the image processor for processing frames
+   * Convert BMP image buffer to JPEG buffer
+   * @param bmpBuffer - Buffer containing BMP image data (24-bit format)
+   * @returns Buffer containing JPEG data
+   * @throws Error if conversion fails
    */
-  createProcessor(): void;
+  convertBmpToJpeg(bmpBuffer: Buffer): Buffer;
 
   /**
-   * Process a BMP frame and return JPEG if changed significantly
-   * @param frameData - Buffer containing BMP image data (24-bit format)
-   * @returns Buffer containing JPEG data if frame changed, null if no significant change
+   * Compare two BMP images and count different pixels
+   * @param bmpBuffer1 - Buffer containing first BMP image data
+   * @param bmpBuffer2 - Buffer containing second BMP image data
+   * @param threshold - Threshold for pixel difference (0-1, similar to pixelmatch)
+   * @returns Number of different pixels
+   * @throws Error if comparison fails
    */
-  processFrame(frameData: Buffer): Buffer | null;
-
-  /**
-   * Get the last processed frame as JPEG
-   * @returns Buffer containing JPEG data of last frame, null if no frame processed
-   */
-  getLastFrame(): Buffer | null;
+  compareBmpImages(bmpBuffer1: Buffer, bmpBuffer2: Buffer, threshold: number): number;
 
   // loaded by nodejs
   path: string;

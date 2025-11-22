@@ -4,7 +4,7 @@ import {INativeModule} from '@/native/native-model';
 
 @Injectable()
 export class ImagelibService {
-  private processorInitialized: boolean = false;
+  private oldFrame: Buffer | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -14,23 +14,15 @@ export class ImagelibService {
   ) {
   }
 
-  public initializeProcessor(): void {
-    this.native.createProcessor();
-    this.processorInitialized = true;
-    this.logger.log('✅ Native image processor initialized');
-  }
-
   async getLastImage(): Promise<Buffer | null> {
-    if (!this.processorInitialized) {
-      this.logger.warn('Image processor not initialized');
+    if (!this.oldFrame) {
       return null;
     }
 
-    console.time("nativeGetLastFrame");
-    const result = this.native.getLastFrame();
-    console.timeEnd("nativeGetLastFrame");
+    console.time("nativeConvertBmpToJpeg");
+    const result = this.native.convertBmpToJpeg(this.oldFrame);
+    console.timeEnd("nativeConvertBmpToJpeg");
     return result;
-
   }
 
   async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
@@ -38,11 +30,24 @@ export class ImagelibService {
       return null;
     }
 
-    const result = this.native.processFrame(frameData);
-
-    if (result) {
-      this.logger.log(`⚠️ CHANGE DETECTED: ${result.length} bytes`);
+    if (!this.oldFrame) {
+      this.oldFrame = frameData;
+      return null;
     }
-    return result;
+
+    console.time("compareBmpImages");
+    const diffPixels = this.native.compareBmpImages(this.oldFrame, frameData, this.threshold);
+    console.timeEnd("compareBmpImages");
+    if (diffPixels < this.diffThreshold) {
+      return null
+    }
+    this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
+
+    console.time("convertBmpToJpeg");
+    const jpegBuffer = this.native.convertBmpToJpeg(frameData);
+    console.timeEnd("convertBmpToJpeg");
+
+    this.oldFrame = frameData;
+    return jpegBuffer;
   }
 }

@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <cmath>
 
-static ImageProcessor* g_processor = nullptr;
-
 // Global context for JPEG writing
 static std::vector<unsigned char>* g_jpegContext = nullptr;
 
@@ -16,14 +14,8 @@ static void jpegWriteCallback(unsigned char byte) {
     }
 }
 
-ImageProcessor::ImageProcessor() : threshold_(0.1), diffThreshold_(1000) {
-}
-
-ImageProcessor::~ImageProcessor() {
-}
-
 // Simple BMP decoder for 24-bit BMPs (standard bottom-up format)
-std::unique_ptr<ImageProcessor::SimpleImage> ImageProcessor::DecodeBMP(const unsigned char* buffer, size_t length) {
+std::unique_ptr<SimpleImage> DecodeBMP(const unsigned char* buffer, size_t length) {
     if (length < 54) return nullptr; // BMP header is 54 bytes
     
     // Check BMP signature
@@ -36,6 +28,11 @@ std::unique_ptr<ImageProcessor::SimpleImage> ImageProcessor::DecodeBMP(const uns
     img->height = *reinterpret_cast<const int*>(&buffer[22]);
     img->components = 3; // RGB
     img->data.resize(img->width * img->height * 3);
+    
+    // Safety checks
+    if (img->width <= 0 || img->height <= 0 || img->width > 10000 || img->height > 10000) {
+        return nullptr;
+    }
     
     // BMP data starts at offset 54
     size_t dataOffset = *reinterpret_cast<const int*>(&buffer[10]);
@@ -64,7 +61,7 @@ std::unique_ptr<ImageProcessor::SimpleImage> ImageProcessor::DecodeBMP(const uns
 }
 
 // JPEG encoder using TooJPEG
-std::vector<unsigned char> ImageProcessor::EncodeJPEG(const SimpleImage& img) {
+std::vector<unsigned char> EncodeJPEG(const SimpleImage& img) {
     std::vector<unsigned char> jpegData;
     
     // Set global context for callback
@@ -84,15 +81,16 @@ std::vector<unsigned char> ImageProcessor::EncodeJPEG(const SimpleImage& img) {
     g_jpegContext = nullptr;
     
     if (!success) {
-        return std::vector<unsigned char>();
+        throw std::runtime_error("JPEG encoding failed");
     }
     
     return jpegData;
 }
 
-size_t ImageProcessor::CompareImages(const SimpleImage& img1, const SimpleImage& img2) {
+// Compare two images and return number of different pixels
+size_t CompareImages(const SimpleImage& img1, const SimpleImage& img2, double threshold) {
     if (img1.width != img2.width || img1.height != img2.height || img1.components != img2.components) {
-        return img1.width * img1.height;
+        throw std::runtime_error("Image dimensions do not match");
     }
     
     size_t diffPixels = 0;
@@ -108,7 +106,7 @@ size_t ImageProcessor::CompareImages(const SimpleImage& img1, const SimpleImage&
         
         // Average difference and check threshold
         double avgDiff = (rDiff + gDiff + bDiff) / 3.0;
-        if (avgDiff > threshold_ * 255.0) {
+        if (avgDiff > threshold * 255.0) {
             diffPixels++;
         }
     }
@@ -116,106 +114,89 @@ size_t ImageProcessor::CompareImages(const SimpleImage& img1, const SimpleImage&
     return diffPixels;
 }
 
-Napi::Value ImageProcessor::ProcessFrame(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    
-    if (info.Length() < 1) {
-        Napi::TypeError::New(env, "Wrong number of arguments").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-    
-    if (!info[0].IsBuffer()) {
-        Napi::TypeError::New(env, "First argument must be a buffer").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-    
-    Napi::Buffer<unsigned char> buffer = info[0].As<Napi::Buffer<unsigned char>>();
-    
-    // Safety check: reject buffers that are too large
-    if (buffer.Length() > 50 * 1024 * 1024) { // 50MB limit
-        Napi::Error::New(env, "Buffer too large").ThrowAsJavaScriptException();
-        return env.Null();
-    }
-    
-    // Decode BMP
-    auto newFrame = DecodeBMP(buffer.Data(), buffer.Length());
-    if (!newFrame) {
-        return env.Null();
-    }
-    
-    // Safety check: reject images that are too large
-    if (newFrame->width > 10000 || newFrame->height > 10000) {
-        return env.Null();
-    }
-    
-    // Check if we have a previous frame to compare
-    if (!lastFrame_) {
-        lastFrame_ = std::move(newFrame);
-        return env.Null();
-    }
-    
-    // Compare frames
-    size_t diffPixels = CompareImages(*newFrame, *lastFrame_);
-    
-    // Update last frame
-    lastFrame_ = std::move(newFrame);
-    
-    // Return encoded frame if threshold exceeded
-    if (diffPixels > diffThreshold_) {
-        auto jpegData = EncodeJPEG(*lastFrame_);
-        if (!jpegData.empty()) {
-            return Napi::Buffer<unsigned char>::Copy(env, jpegData.data(), jpegData.size());
+namespace ImageProc {
+    Napi::Value ConvertBmpToJpeg(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+        
+        if (info.Length() < 1) {
+            throw Napi::TypeError::New(env, "Wrong number of arguments");
         }
-    }
-    
-    return env.Null();
-}
-
-Napi::Value ImageProcessor::GetLastFrame(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    
-    if (!lastFrame_) {
-        return env.Null();
-    }
-    
-    auto jpegData = EncodeJPEG(*lastFrame_);
-    if (!jpegData.empty()) {
+        
+        if (!info[0].IsBuffer()) {
+            throw Napi::TypeError::New(env, "First argument must be a buffer");
+        }
+        
+        Napi::Buffer<unsigned char> buffer = info[0].As<Napi::Buffer<unsigned char>>();
+        
+        // Safety check: reject buffers that are too large
+        if (buffer.Length() > 50 * 1024 * 1024) { // 50MB limit
+            throw Napi::Error::New(env, "Buffer too large");
+        }
+        
+        // Decode BMP
+        auto img = DecodeBMP(buffer.Data(), buffer.Length());
+        if (!img) {
+            throw Napi::Error::New(env, "Failed to decode BMP image");
+        }
+        
+        // Encode JPEG
+        auto jpegData = EncodeJPEG(*img);
+        if (jpegData.empty()) {
+            throw Napi::Error::New(env, "Failed to encode JPEG image");
+        }
+        
         return Napi::Buffer<unsigned char>::Copy(env, jpegData.data(), jpegData.size());
     }
     
-    return env.Null();
-}
-
-namespace ImageProc {
-    Napi::Value CreateProcessor(const Napi::CallbackInfo& info) {
+    Napi::Value CompareBmpImages(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
-        if (g_processor) {
-            delete g_processor;
+        
+        if (info.Length() < 3) {
+            throw Napi::TypeError::New(env, "Wrong number of arguments");
         }
-        g_processor = new ImageProcessor();
-        return env.Null();
-    }
-    
-    Napi::Value ProcessFrame(const Napi::CallbackInfo& info) {
-        if (!g_processor) {
-            Napi::Error::New(info.Env(), "ImageProcessor not initialized").ThrowAsJavaScriptException();
-            return info.Env().Null();
+        
+        if (!info[0].IsBuffer() || !info[1].IsBuffer()) {
+            throw Napi::TypeError::New(env, "First two arguments must be buffers");
         }
-        return g_processor->ProcessFrame(info);
-    }
-    
-    Napi::Value GetLastFrame(const Napi::CallbackInfo& info) {
-        if (!g_processor) {
-            Napi::Error::New(info.Env(), "ImageProcessor not initialized").ThrowAsJavaScriptException();
-            return info.Env().Null();
+        
+        if (!info[2].IsNumber()) {
+            throw Napi::TypeError::New(env, "Third argument must be a number (threshold)");
         }
-        return g_processor->GetLastFrame(info);
+        
+        Napi::Buffer<unsigned char> buffer1 = info[0].As<Napi::Buffer<unsigned char>>();
+        Napi::Buffer<unsigned char> buffer2 = info[1].As<Napi::Buffer<unsigned char>>();
+        double threshold = info[2].As<Napi::Number>().DoubleValue();
+        
+        // Validate threshold
+        if (threshold < 0.0 || threshold > 1.0) {
+            throw Napi::RangeError::New(env, "Threshold must be between 0 and 1");
+        }
+        
+        // Safety check: reject buffers that are too large
+        if (buffer1.Length() > 50 * 1024 * 1024 || buffer2.Length() > 50 * 1024 * 1024) {
+            throw Napi::Error::New(env, "Buffer too large");
+        }
+        
+        // Decode BMPs
+        auto img1 = DecodeBMP(buffer1.Data(), buffer1.Length());
+        if (!img1) {
+            throw Napi::Error::New(env, "Failed to decode first BMP image");
+        }
+        
+        auto img2 = DecodeBMP(buffer2.Data(), buffer2.Length());
+        if (!img2) {
+            throw Napi::Error::New(env, "Failed to decode second BMP image");
+        }
+        
+        // Compare images
+        size_t diffPixels = CompareImages(*img1, *img2, threshold);
+        
+        return Napi::Number::New(env, static_cast<double>(diffPixels));
     }
     
     Napi::Object Init(Napi::Env env, Napi::Object exports) {
-        exports.Set(Napi::String::New(env, "createProcessor"), Napi::Function::New(env, ImageProc::CreateProcessor));
-        exports.Set(Napi::String::New(env, "processFrame"), Napi::Function::New(env, ImageProc::ProcessFrame));
-        exports.Set(Napi::String::New(env, "getLastFrame"), Napi::Function::New(env, ImageProc::GetLastFrame));
+        exports.Set(Napi::String::New(env, "convertBmpToJpeg"), Napi::Function::New(env, ImageProc::ConvertBmpToJpeg));
+        exports.Set(Napi::String::New(env, "compareBmpImages"), Napi::Function::New(env, ImageProc::CompareBmpImages));
         return exports;
     }
 }
