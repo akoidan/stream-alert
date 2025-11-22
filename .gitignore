@@ -17,4 +17,4 @@ out
 # SEA (Single Executable Application) build artifacts
 *.exe
 sea-prep.blob
-sea-prep-vite.blob
+sea-prep.blob

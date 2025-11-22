@@ -1,4 +1,4 @@
 {
   "main": "dist/main-vite.mjs",
-  "output": "sea-prep-vite.blob"
+  "output": "sea-prep.blob"
 }
