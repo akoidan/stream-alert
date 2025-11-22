@@ -37,16 +37,16 @@ interface INativeModule {
   convertRgbToJpeg(rgbBuffer: Buffer, width: number, height: number): Promise<Buffer>;
 
   /**
-   * Compare two RGB images and count different pixels
+   * Compare two RGB images and count different pixels asynchronously
    * @param rgbBuffer1 - Buffer containing first RGB image data
    * @param rgbBuffer2 - Buffer containing second RGB image data
    * @param width - Image width in pixels
    * @param height - Image height in pixels
    * @param threshold - Threshold for pixel difference (0-1, similar to pixelmatch)
-   * @returns Number of different pixels
+   * @returns Promise<number> containing the number of different pixels
    * @throws Error if comparison fails
    */
-  compareRgbImages(rgbBuffer1: Buffer, rgbBuffer2: Buffer, width: number, height: number, threshold: number): number;
+  compareRgbImages(rgbBuffer1: Buffer, rgbBuffer2: Buffer, width: number, height: number, threshold: number): Promise<number>;
 
   // loaded by nodejs
   path: string;

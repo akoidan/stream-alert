@@ -70,6 +70,61 @@ size_t CompareRgbImagesDirect(const unsigned char* data1, const unsigned char* d
     return diffPixels;
 }
 
+// Async worker for image comparison
+class ImageComparisonWorker : public Napi::AsyncWorker {
+public:
+    ImageComparisonWorker(Napi::Function& callback, 
+                         const std::vector<unsigned char>& buffer1Data,
+                         const std::vector<unsigned char>& buffer2Data,
+                         int width, int height, double threshold,
+                         Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(callback, "ImageComparisonWorker"),
+          buffer1Data(buffer1Data),
+          buffer2Data(buffer2Data),
+          width(width), height(height), threshold(threshold),
+          deferred(deferred) {}
+
+    ~ImageComparisonWorker() {}
+
+    // This runs on the worker thread
+    void Execute() override {
+        try {
+            // Compare RGB images directly (this runs in the background thread)
+            diffPixels = CompareRgbImagesDirect(buffer1Data.data(), buffer2Data.data(), width, height, threshold);
+        } catch (const std::exception& e) {
+            SetError(e.what());
+        }
+    }
+
+    // This runs on the main thread after Execute() completes
+    void OnOK() override {
+        Napi::Env env = Env();
+        Napi::HandleScope scope(env);
+        
+        // Resolve the promise with the result
+        deferred.Resolve(Napi::Number::New(env, static_cast<double>(diffPixels)));
+    }
+
+    // This runs on the main thread if Execute() throws an error
+    void OnError(const Napi::Error& e) override {
+        Napi::Env env = Env();
+        Napi::HandleScope scope(env);
+        
+        // Reject the promise with the error
+        deferred.Reject(e.Value());
+    }
+
+private:
+    std::vector<unsigned char> buffer1Data;
+    std::vector<unsigned char> buffer2Data;
+    std::vector<unsigned char> jpegResult;
+    int width;
+    int height;
+    double threshold;
+    size_t diffPixels;
+    Napi::Promise::Deferred deferred;
+};
+
 // Async worker for JPEG conversion
 class JpegConversionWorker : public Napi::AsyncWorker {
 public:
@@ -209,10 +264,26 @@ namespace ImageProc {
             throw Napi::Error::New(env, "Buffer too small for specified dimensions");
         }
         
-        // Compare RGB images directly (no decoding needed!)
-        size_t diffPixels = CompareRgbImagesDirect(buffer1.Data(), buffer2.Data(), width, height, threshold);
+        // Create a promise
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         
-        return Napi::Number::New(env, static_cast<double>(diffPixels));
+        // Create a dummy callback for AsyncWorker (we won't use it but AsyncWorker requires it)
+        Napi::Function dummyCallback = Napi::Function::New(env, [](const Napi::CallbackInfo&) {});
+        
+        // Create and queue the async worker
+        ImageComparisonWorker* worker = new ImageComparisonWorker(
+            dummyCallback,
+            std::vector<unsigned char>(buffer1.Data(), buffer1.Data() + expectedSize),
+            std::vector<unsigned char>(buffer2.Data(), buffer2.Data() + expectedSize),
+            width, 
+            height,
+            threshold,
+            deferred
+        );
+        
+        worker->Queue();
+        
+        return deferred.Promise();
     }
     
     Napi::Object Init(Napi::Env env, Napi::Object exports) {

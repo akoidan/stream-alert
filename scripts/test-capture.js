@@ -27,6 +27,7 @@ console.log('Waiting for frames...');
 
 // Add setInterval to demonstrate non-blocking behavior
 let heartbeatCount = 0;
+let heartbeatInterval = null;
 
 
 const shutdown = async () => {
@@ -43,7 +44,7 @@ const shutdown = async () => {
   if (savedFrame && savedFrame.buffer) {
     console.log(`Converting last RGB frame to JPEG...`);
     try {
-      const heartbeatInterval = setInterval(() => {
+      heartbeatInterval = setInterval(() => {
         heartbeatCount++;
         process.stdout.write(',')
       }, 50);

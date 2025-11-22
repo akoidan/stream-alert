@@ -32,7 +32,7 @@ export class ImagelibService {
       return null;
     }
 
-    const diffPixels = this.native.compareRgbImages(
+    const diffPixels = await this.native.compareRgbImages(
       this.oldFrame.buffer, 
       frameData.buffer, 
       frameData.width, 
