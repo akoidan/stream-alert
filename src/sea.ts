@@ -1,30 +1,26 @@
-import {join} from 'path';
 import process from 'node:process';
 
-// Enable file-based require for SEA
-if (require('node:sea').isSea()) {
-  const { createRequire } = require('node:module');
-  (global as any).require = createRequire(__filename);
-}
-
-process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config');
-
-import fs from 'fs';
 import readline from 'readline';
 import {CustomLogger} from '@/app/custom-logger';
 import {AppModule} from '@/app/app-module';
 import {NestFactory} from '@nestjs/core';
+import {globalSeaConf} from '@/config-resolve/config-resolve-model'
+import {getAsset} from 'node:sea';
 
-// Load configuration directly
-const configPath = join(process.env.NODE_CONFIG_TS_DIR, 'default.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-console.log(`Config path ${configPath}`)
-console.log(`Config  ${config}`)
+
+const customLogger = new CustomLogger();
+
+const text = getAsset('config-default-json', 'utf8');
+Object.entries(JSON.parse(text)) .forEach(([key, value]) => {
+  // @ts-ignore
+  globalSeaConf[key] = value;
+});
+
 
 // Bootstrap function that handles configuration
 async function bootstrap() {
-  console.log('🔧 Stream Alert Configuration');
-  console.log('================================\n');
+  customLogger.log('🔧 Stream Alert Configuration');
+  customLogger.log('================================\n');
 
   // Create readline interface for user input
   const rl = readline.createInterface({
@@ -75,82 +71,79 @@ async function bootstrap() {
 
   try {
     // Configure Telegram section
-    console.log('📱 Telegram Configuration');
-    console.log('--------------------------');
+    customLogger.log('📱 Telegram Configuration');
+    customLogger.log('--------------------------');
 
-    const telegramToken = isEnvVariable(config.telegram.token)
+    const telegramToken = isEnvVariable(globalSeaConf.telegram.token)
       ? await prompt('Telegram bot token')
-      : await prompt('Telegram bot token', config.telegram.token);
-    config.telegram.token = validateAndConvert(telegramToken, 'string', 'Telegram token');
+      : await prompt('Telegram bot token', globalSeaConf.telegram.token);
+    globalSeaConf.telegram.token = validateAndConvert(telegramToken, 'string', 'Telegram token');
 
-    const telegramChatId = isEnvVariable(config.telegram.chatId)
+    const telegramChatId = isEnvVariable(globalSeaConf.telegram.chatId)
       ? await prompt('Telegram chat ID')
-      : await prompt('Telegram chat ID', config.telegram.chatId.toString());
-    config.telegram.chatId = validateAndConvert(telegramChatId, 'number', 'Telegram chat ID');
+      : await prompt('Telegram chat ID', globalSeaConf.telegram.chatId.toString());
+    globalSeaConf.telegram.chatId = validateAndConvert(telegramChatId, 'number', 'Telegram chat ID');
 
-    const telegramSpamDelay = isEnvVariable(config.telegram.spamDelay)
+    const telegramSpamDelay = isEnvVariable(globalSeaConf.telegram.spamDelay)
       ? await prompt('Spam delay in milliseconds')
-      : await prompt('Spam delay in milliseconds', config.telegram.spamDelay.toString());
-    config.telegram.spamDelay = validateAndConvert(telegramSpamDelay, 'number', 'Spam delay');
+      : await prompt('Spam delay in milliseconds', globalSeaConf.telegram.spamDelay.toString());
+    globalSeaConf.telegram.spamDelay = validateAndConvert(telegramSpamDelay, 'number', 'Spam delay');
 
-    const telegramMessage = isEnvVariable(config.telegram.message)
+    const telegramMessage = isEnvVariable(globalSeaConf.telegram.message)
       ? await prompt('Default message for alerts')
-      : await prompt('Default message for alerts', config.telegram.message);
-    config.telegram.message = validateAndConvert(telegramMessage, 'string', 'Telegram message');
+      : await prompt('Default message for alerts', globalSeaConf.telegram.message);
+    globalSeaConf.telegram.message = validateAndConvert(telegramMessage, 'string', 'Telegram message');
 
-    console.log('');
+    customLogger.log('');
 
     // Configure Camera section
-    console.log('📷 Camera Configuration');
-    console.log('------------------------');
+    customLogger.log('📷 Camera Configuration');
+    customLogger.log('------------------------');
 
-    const cameraName = isEnvVariable(config.camera.name)
+    const cameraName = isEnvVariable(globalSeaConf.camera.name)
       ? await prompt('Camera name')
-      : await prompt('Camera name', config.camera.name);
-    config.camera.name = validateAndConvert(cameraName, 'string', 'Camera name');
+      : await prompt('Camera name', globalSeaConf.camera.name);
+    globalSeaConf.camera.name = validateAndConvert(cameraName, 'string', 'Camera name');
 
-    const cameraFrameRate = isEnvVariable(config.camera.frameRate)
+    const cameraFrameRate = isEnvVariable(globalSeaConf.camera.frameRate)
       ? await prompt('Frame rate (frames per second)')
-      : await prompt('Frame rate (frames per second)', config.camera.frameRate.toString());
-    config.camera.frameRate = validateAndConvert(cameraFrameRate, 'number', 'Frame rate');
+      : await prompt('Frame rate (frames per second)', globalSeaConf.camera.frameRate.toString());
+    globalSeaConf.camera.frameRate = validateAndConvert(cameraFrameRate, 'number', 'Frame rate');
 
-    console.log('');
+    customLogger.log('');
 
     // Configure Diff section
-    console.log('🔍 Motion Detection Configuration');
-    console.log('----------------------------------');
+    customLogger.log('🔍 Motion Detection Configuration');
+    customLogger.log('----------------------------------');
 
-    const diffPixels = isEnvVariable(config.diff.pixels)
+    const diffPixels = isEnvVariable(globalSeaConf.diff.pixels)
       ? await prompt('Minimum pixels changed to trigger detection')
-      : await prompt('Minimum pixels changed to trigger detection', config.diff.pixels.toString());
-    config.diff.pixels = validateAndConvert(diffPixels, 'number', 'Diff pixels');
+      : await prompt('Minimum pixels changed to trigger detection', globalSeaConf.diff.pixels.toString());
+    globalSeaConf.diff.pixels = validateAndConvert(diffPixels, 'number', 'Diff pixels');
 
-    const diffThreshold = isEnvVariable(config.diff.threshold)
+    const diffThreshold = isEnvVariable(globalSeaConf.diff.threshold)
       ? await prompt('Threshold for pixel changes (0.0 - 1.0)')
-      : await prompt('Threshold for pixel changes (0.0 - 1.0)', config.diff.threshold.toString());
+      : await prompt('Threshold for pixel changes (0.0 - 1.0)', globalSeaConf.diff.threshold.toString());
     const threshold = validateAndConvert(diffThreshold, 'number', 'Diff threshold');
     if (threshold < 0 || threshold > 1) {
       throw new Error('Diff threshold must be between 0.0 and 1.0');
     }
-    config.diff.threshold = threshold;
+    globalSeaConf.diff.threshold = threshold;
 
-    console.log('\n✅ Configuration completed successfully!');
-    console.log('Starting application...\n');
+    customLogger.log('\n✅ Configuration completed successfully!');
+    customLogger.log('Starting application...\n');
 
     rl.close();
-
-    // Write updated config back to file
-    const updatedConfig = JSON.stringify(config, null, 2);
-    fs.writeFileSync(configPath, updatedConfig);
+    
 
     // Start the NestJS application
 
-    const customLogger = new CustomLogger();
+
     const app = await NestFactory.createApplicationContext(AppModule, {
       logger: customLogger,
     });
 
-    console.log('Application started successfully');
+    customLogger.log('Application started successfully');
 
   } catch (error) {
     console.error('❌ Configuration error:', (error as Error).message);

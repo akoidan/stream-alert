@@ -1,18 +1,13 @@
 /// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
-import {config} from 'node-ts-config'
 import {ImagelibService} from "@/imagelib/imagelib-service";
 import {NativeModule} from "@/native/native-module";
-import {imageLibConf} from "@/imagelib/imagelib-model";
+import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
 
 @Module({
-  imports: [NativeModule],
+  imports: [NativeModule, ConfigResolveModule],
   providers: [
     Logger,
-    {
-      provide: imageLibConf,
-      useValue: config.diff,
-    },
     ImagelibService,
   ],
   exports: [ImagelibService]

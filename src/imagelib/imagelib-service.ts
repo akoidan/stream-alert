@@ -1,8 +1,7 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {FrameData, INativeModule, Native} from '@/native/native-model';
-import {Diff} from "node-ts-config";
-import {imageLibConf} from "@/imagelib/imagelib-model";
-
+import type {Diff} from "node-ts-config";
+import {DiffConf} from "@/config-resolve/config-resolve-model";
 
 @Injectable()
 export class ImagelibService {
@@ -12,7 +11,7 @@ export class ImagelibService {
     private readonly logger: Logger,
     @Inject(Native)
     private readonly native: INativeModule,
-    @Inject(imageLibConf)
+    @Inject(DiffConf)
     public readonly conf: Diff,
   ) {
   }
@@ -36,17 +35,17 @@ export class ImagelibService {
     }
 
     const diffPixels = await this.native.compareRgbImages(
-      this.oldFrame.buffer, 
-      frameData.buffer, 
-      frameData.width, 
-      frameData.height, 
+      this.oldFrame.buffer,
+      frameData.buffer,
+      frameData.width,
+      frameData.height,
       this.conf.threshold
     );
-    
+
     if (diffPixels < this.conf.pixels) {
       return null;
     }
-    
+
     this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
 
     const jpegBuffer = await this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);

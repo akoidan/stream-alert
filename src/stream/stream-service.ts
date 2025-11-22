@@ -1,8 +1,8 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import type {FrameDetector} from "@/app/app-model";
 import {INativeModule, Native} from "@/native/native-model";
-import {Camera} from "node-ts-config";
-import {CameraConf} from "@/stream/stream-model";
+import type {Camera} from "node-ts-config";
+import {CameraConf} from "@/config-resolve/config-resolve-model";
 
 @Injectable()
 export class StreamService {

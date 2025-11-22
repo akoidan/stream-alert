@@ -2,24 +2,23 @@
 import {Logger, Module} from '@nestjs/common';
 import {TelegramService} from "@/telegram/telegram-service";
 import {Telegraf} from "telegraf";
-import {config} from 'node-ts-config'
-import {TelegramConfig} from "@/telegram/telegram-model";
+import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
+import {TelegramConfig} from "@/config-resolve/config-resolve-model";
+import {Telegram} from "node-ts-config";
 
 @Module({
+  imports: [ConfigResolveModule],
   exports: [TelegramService],
   providers: [
     Logger,
     TelegramService,
     {
       provide: Telegraf,
-      useFactory: () => {
-        return new Telegraf(config.telegram.token);
+      useFactory: (tg: Telegram): Telegraf => {
+        return new Telegraf(tg.token);
       },
+      inject: [TelegramConfig],
     },
-    {
-      provide: TelegramConfig,
-      useValue: config.telegram,
-    }
   ],
 })
 export class TelegramModule {
