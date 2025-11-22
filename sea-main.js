@@ -1,6 +1,7 @@
 const { createRequire } = require('module');
 const path = require('path');
 const readline = require('readline');
+const fs = require('fs');
 
 // Create readline interface for user input
 const rl = readline.createInterface({
@@ -54,14 +55,20 @@ async function configureApp() {
   console.log('🔧 Stream Alert Configuration');
   console.log('================================\n');
 
-  // Load the config module to modify it globally
-  const requireFromAssets = createRequire(path.join(__dirname, 'dist', 'main.js'));
-  
-  // Change to the dist directory so relative imports work
-  process.chdir(path.join(__dirname, 'dist'));
-  
-  // Import config to modify it globally
-  const { config } = requireFromAssets('./main.js');
+  // Load configuration directly from file
+  let config;
+  try {
+    const configPath = path.join(__dirname, 'config', 'default.json');
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      config = JSON.parse(configContent);
+    } else {
+      throw new Error('Configuration file not found');
+    }
+  } catch (error) {
+    console.error('Failed to load configuration:', error.message);
+    process.exit(1);
+  }
 
   // Configure Telegram section
   console.log('📱 Telegram Configuration');
@@ -132,6 +139,9 @@ async function configureApp() {
 // Run configuration and then start the app
 configureApp()
   .then(() => {
+    // Change to the dist directory so relative imports work
+    process.chdir(path.join(__dirname, 'dist'));
+    
     // Load the actual main application using the asset-aware require
     const requireFromAssets = createRequire(path.join(__dirname, 'dist', 'main.js'));
     try {

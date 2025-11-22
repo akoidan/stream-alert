@@ -1,0 +1,16 @@
+{
+  "telegram": {
+    "token": "@@TG_TOKEN",
+    "chatId": "@@TG_CHAT_ID",
+    "spamDelay": 10000,
+    "message": "Changes detected"
+  },
+  "camera": {
+    "name": "@@CAMERA_NAME",
+    "frameRate": 1
+  },
+  "diff": {
+    "pixels": 1000,
+    "threshold": 0.0
+  }
+}
