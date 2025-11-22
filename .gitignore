@@ -17,6 +17,4 @@ out
 
 # SEA (Single Executable Application) build artifacts
 *.exe
-sea-*.json
-sea-*.js
-sea-*.blob
+sea-prep.blob

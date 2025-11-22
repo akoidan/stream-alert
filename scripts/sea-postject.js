@@ -45,7 +45,7 @@ if (fs.existsSync(appExecutable)) {
   try {
     fs.unlinkSync(appExecutable);
   } catch (error) {
-    console.log('Could not remove old executable (file may be in use), using temporary name');
+    console.log('Could not remove old executable (file may be in use), using timestamp name');
     // Use a timestamp to create a unique name
     const timestamp = Date.now();
     appExecutable = `stream-alert-${timestamp}.exe`;
@@ -65,28 +65,12 @@ try {
 
 // Use postject to inject the blob into our copied executable
 try {
-  // Try using the postject CLI tool first
-  execSync(`npx postject "${appExecutable}" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"`, { stdio: 'inherit' });
-  console.log('SEA executable created successfully: stream-alert.exe');
-  console.log('The sea-assets folder contains the bundled assets and should be distributed with the executable');
+  // Use yarn to run postject (follows project rules)
+  execSync(`yarn postject "${appExecutable}" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"`, { stdio: 'inherit' });
+  console.log('SEA executable created successfully');
 } catch (error) {
-  console.error('Error creating SEA executable with CLI:', error.message);
-  
-  // Fallback: try built-in postject
-  try {
-    const { postject } = require('node');
-    postject(appExecutable, 'NODE_SEA_BLOB', 'sea-prep.blob', {
-      sentinelFuse: 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2',
-    });
-    console.log('SEA executable created successfully using built-in postject');
-  } catch (fallbackError) {
-    console.error('Both CLI and built-in postject failed:', fallbackError.message);
-    console.log('Note: The executable may still work despite the error');
-    
-    if (fs.existsSync(appExecutable)) {
-      console.log('Executable exists, testing if it works...');
-    } else {
-      process.exit(1);
-    }
-  }
+  console.error('Postject failed:', error.message);
+  process.exit(1);
 }
+
+console.log('The sea-assets folder contains the bundled assets and should be distributed with the executable');
