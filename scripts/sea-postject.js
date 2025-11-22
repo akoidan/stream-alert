@@ -4,7 +4,7 @@ const path = require('path');
 
 // Get the Node.js executable path
 const nodePath = process.execPath;
-const outputExe = 'stream-alert.exe';
+const outputExe = 'dist/stream-alert.exe';
 
 // Create a copy of the Node.js executable
 console.log('Creating copy of Node.js executable...');
