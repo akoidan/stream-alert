@@ -6,9 +6,9 @@
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
     "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
-    "transpile": "nest build",
-    "build": "cmake-js build --debug",
-    "build:sea": "npm-run-all -s build transpile && node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
+    "nest": "nest build",
+    "cmake": "cmake-js build --debug",
+    "build": "npm-run-all -s cmake nest && node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
   },
   "engines": {
     "node": ">=24.0.0 <25",

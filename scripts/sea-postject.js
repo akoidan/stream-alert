@@ -2,38 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Create sea-assets directory if it doesn't exist
-if (!fs.existsSync('sea-assets')) {
-  fs.mkdirSync('sea-assets');
-}
-
-// Copy the entire dist folder to sea-assets
-function copyFolderSync(src, dest) {
-  if (!fs.existsSync(dest)) {
-    fs.mkdirSync(dest, { recursive: true });
-  }
-  
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-  
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    
-    if (entry.isDirectory()) {
-      copyFolderSync(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-// Copy dist folder contents
-copyFolderSync('./dist', './sea-assets');
-
-// Copy native.node to sea-assets
+// Copy native.node to dist
 if (fs.existsSync('build/Debug/native.node')) {
-  fs.copyFileSync('build/Debug/native.node', 'sea-assets/native.node');
-  console.log('Copied native.node to sea-assets');
+  fs.copyFileSync('build/Debug/native.node', 'dist/native.node');
+  console.log('Copied native.node to dist');
 } else {
   console.error('native.node not found in build/Debug directory');
   process.exit(1);
@@ -73,4 +45,4 @@ try {
   process.exit(1);
 }
 
-console.log('The sea-assets folder contains the bundled assets and should be distributed with the executable');
+console.log('The dist folder contains the bundled assets and should be distributed with the executable');

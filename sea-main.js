@@ -55,10 +55,10 @@ async function configureApp() {
   console.log('================================\n');
 
   // Load the config module to modify it globally
-  const requireFromAssets = createRequire(path.join(__dirname, 'sea-assets', 'main.js'));
+  const requireFromAssets = createRequire(path.join(__dirname, 'dist', 'main.js'));
   
-  // Change to the sea-assets directory so relative imports work
-  process.chdir(path.join(__dirname, 'sea-assets'));
+  // Change to the dist directory so relative imports work
+  process.chdir(path.join(__dirname, 'dist'));
   
   // Import config to modify it globally
   const { config } = requireFromAssets('./main.js');
@@ -133,7 +133,7 @@ async function configureApp() {
 configureApp()
   .then(() => {
     // Load the actual main application using the asset-aware require
-    const requireFromAssets = createRequire(path.join(__dirname, 'sea-assets', 'main.js'));
+    const requireFromAssets = createRequire(path.join(__dirname, 'dist', 'main.js'));
     try {
       requireFromAssets('./main.js');
     } catch (error) {

@@ -4,7 +4,6 @@ yarn-error.log*
 .DS_Store
 .idea
 src/config/user
-sea-assets
 /build
 .vscode/*
 .vs
