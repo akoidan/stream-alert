@@ -1,11 +1,13 @@
-import { join } from 'path';
+import {join} from 'path';
 import * as process from 'node:process';
-import * as fs from 'fs';
+
 process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config');
 
+import * as fs from 'fs';
 import * as readline from 'readline';
-import { CustomLogger } from '@/app/custom-logger';
-import { AppModule } from '@/app/app-module';
+import {CustomLogger} from '@/app/custom-logger';
+import {AppModule} from '@/app/app-module';
+import {NestFactory} from '@nestjs/core';
 
 // Load configuration directly
 const configPath = join(process.env.NODE_CONFIG_TS_DIR, 'default.json');
@@ -25,10 +27,10 @@ async function bootstrap() {
   // Helper function to prompt user for input
   function prompt(question: string, defaultValue: string | null = null): Promise<string> {
     return new Promise((resolve) => {
-      const promptText = defaultValue !== null 
+      const promptText = defaultValue !== null
         ? `${question} (default: ${defaultValue}): `
         : `${question}: `;
-      
+
       rl.question(promptText, (answer) => {
         if (answer.trim() === '' && defaultValue !== null) {
           resolve(defaultValue);
@@ -67,8 +69,8 @@ async function bootstrap() {
     // Configure Telegram section
     console.log('📱 Telegram Configuration');
     console.log('--------------------------');
-    
-    const telegramToken = isEnvVariable(config.telegram.token) 
+
+    const telegramToken = isEnvVariable(config.telegram.token)
       ? await prompt('Telegram bot token')
       : await prompt('Telegram bot token', config.telegram.token);
     config.telegram.token = validateAndConvert(telegramToken, 'string', 'Telegram token');
@@ -93,7 +95,7 @@ async function bootstrap() {
     // Configure Camera section
     console.log('📷 Camera Configuration');
     console.log('------------------------');
-    
+
     const cameraName = isEnvVariable(config.camera.name)
       ? await prompt('Camera name')
       : await prompt('Camera name', config.camera.name);
@@ -109,7 +111,7 @@ async function bootstrap() {
     // Configure Diff section
     console.log('🔍 Motion Detection Configuration');
     console.log('----------------------------------');
-    
+
     const diffPixels = isEnvVariable(config.diff.pixels)
       ? await prompt('Minimum pixels changed to trigger detection')
       : await prompt('Minimum pixels changed to trigger detection', config.diff.pixels.toString());
@@ -126,7 +128,7 @@ async function bootstrap() {
 
     console.log('\n✅ Configuration completed successfully!');
     console.log('Starting application...\n');
-    
+
     rl.close();
 
     // Write updated config back to file
@@ -134,8 +136,7 @@ async function bootstrap() {
     fs.writeFileSync(configPath, updatedConfig);
 
     // Start the NestJS application
-    const { NestFactory } = await import('@nestjs/core');
-    
+
     const customLogger = new CustomLogger();
     const app = await NestFactory.createApplicationContext(AppModule, {
       logger: customLogger,
