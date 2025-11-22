@@ -1,10 +1,10 @@
 import {join} from 'path';
-import * as process from 'node:process';
+import process from 'node:process';
 
 process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config');
 
-import * as fs from 'fs';
-import * as readline from 'readline';
+import fs from 'fs';
+import readline from 'readline';
 import {CustomLogger} from '@/app/custom-logger';
 import {AppModule} from '@/app/app-module';
 import {NestFactory} from '@nestjs/core';

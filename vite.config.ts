@@ -7,8 +7,22 @@ export default defineConfig({
   build: {
     target: 'node18',
     outDir: 'dist',
+    ssrTarget: 'node',
     rollupOptions: {
       input: resolve(__dirname, 'src/main-vite.ts'),
+      external: ['fs', 'path', 'process', 'http', 'https', 'url', 'util', 'stream',
+                'crypto', 'zlib', 'net', 'tls', 'dns', 'async_hooks', 'querystring',
+                'events', 'buffer', 'child_process', 'cluster', 'dgram', 'inspector',
+                'module', 'os', 'perf_hooks', 'readline', 'repl', 'string_decoder',
+                'timers', 'trace_events', 'tty', 'v8', 'vm', 'wasi', 'worker_threads',
+                /^node:/],
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]',
+        format: 'cjs',
+        interop: 'auto'
+      },
       plugins: [
         {
           name: 'copy-required-dependencies',
@@ -20,6 +34,19 @@ export default defineConfig({
             // Ensure dist/node_modules exists
             if (!existsSync(distNodeModulesDir)) {
               mkdirSync(distNodeModulesDir, { recursive: true });
+            }
+
+            // Copy native.node file
+            const nativeNodePath = resolve(__dirname, 'build', 'Debug', 'native.node');
+            const distNativeDir = resolve(__dirname, 'dist', 'build', 'Debug');
+            if (existsSync(nativeNodePath)) {
+              if (!existsSync(distNativeDir)) {
+                mkdirSync(distNativeDir, { recursive: true });
+              }
+              cpSync(nativeNodePath, resolve(distNativeDir, 'native.node'));
+              console.log('Copied native.node');
+            } else {
+              console.warn('Warning: native.node not found at', nativeNodePath);
             }
 
             // Function to copy a module and ALL its dependencies recursively
@@ -90,12 +117,6 @@ export default defineConfig({
           }
         }
       ]
-    },
-    output: {
-      entryFileNames: '[name].mjs',
-      chunkFileNames: '[name].mjs',
-      assetFileNames: '[name].[ext]',
-      format: 'es'
     },
     minify: false,
     sourcemap: false,
