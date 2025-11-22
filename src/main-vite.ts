@@ -136,8 +136,8 @@ async function bootstrap() {
 
     // Start the NestJS application
     const { NestFactory } = require('@nestjs/core');
-    const { CustomLogger } = require('@/app/custom-logger');
-    const { AppModule } = require('@/app/app-module');
+    const { CustomLogger } = require('./app/custom-logger');
+    const { AppModule } = require('./app/app-module');
     
     const customLogger = new CustomLogger();
     const app = await NestFactory.createApplicationContext(AppModule, {
