@@ -1,8 +1,8 @@
 {
-  "main": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\sea-bundle.js",
-  "output": "sea-prep.blob",
+  "main": "dist/sea-bundle.js",
+  "output": "dist/sea-prep.blob",
   "assets": {
-    "build-Debug-native-node": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\build\\Debug\\native.node",
-    "config-default-json": "C:\\Users\\death\\WebstormProjects\\stream-alert\\dist\\config\\default.json"
+    "build-Debug-native-node": "dist/build/Debug/native.node",
+    "config-default-json": "dist/config/default.json"
   }
 }

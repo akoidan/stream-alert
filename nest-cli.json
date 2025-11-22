@@ -1,6 +1,7 @@
 {
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
+  "entryFile": "sea",
   "compilerOptions": {
     "assets": ["**/*.node", "config/default.json"],
     "deleteOutDir": true,

@@ -8,7 +8,9 @@
     "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
     "cmake": "cmake-js build --debug",
+    "nest": "nest build",
     "esbuild": "node esbuild.config.js",
+    "prenative": "npm-run-all -s nest esbuild",
     "native": "node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
   },
   "engines": {

@@ -1,16 +1,12 @@
 const esbuild = require('esbuild');
-const { resolve } = require('path');
+const {resolve} = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
 
-// First compile with NestJS to preserve decorators/metadata
-console.log('Compiling TypeScript with NestJS...');
-execSync('yarn nest build', { stdio: 'inherit' });
 
 esbuild.build({
-  entryPoints: [resolve(__dirname, 'dist/main.js')],
+  entryPoints: [resolve(__dirname, 'dist', 'sea.js')],
   bundle: true,
-  outfile: resolve(__dirname, 'dist/sea-bundle.js'),
+  outfile: resolve(__dirname,  'dist', 'sea-bundle.js'),
   platform: 'node',
   target: 'node24',
   format: 'cjs',
@@ -22,9 +18,9 @@ require('reflect-metadata');
   },
   external: [
     'fs', 'path', 'process', 'node:process', 'node:fs', 'node:readline', 'node:module',
-    'http', 'https', 'url', 'util', 'stream', 'crypto', 'zlib', 'net', 'tls', 'dns', 
-    'async_hooks', 'querystring', 'events', 'buffer', 'child_process', 'cluster', 
-    'dgram', 'inspector', 'module', 'os', 'perf_hooks', 'readline', 'repl', 
+    'http', 'https', 'url', 'util', 'stream', 'crypto', 'zlib', 'net', 'tls', 'dns',
+    'async_hooks', 'querystring', 'events', 'buffer', 'child_process', 'cluster',
+    'dgram', 'inspector', 'module', 'os', 'perf_hooks', 'readline', 'repl',
     'string_decoder', 'timers', 'trace_events', 'tty', 'v8', 'vm', 'wasi', 'worker_threads',
     // Externalize optional NestJS packages
     '@nestjs/websockets', '@nestjs/microservices', '@nestjs/websockets/socket-module',
@@ -34,9 +30,9 @@ require('reflect-metadata');
     {
       name: 'alias-plugin',
       setup(build) {
-        build.onResolve({ filter: /^@\/(.*)$/ }, (args) => {
+        build.onResolve({filter: /^@\/(.*)$/}, (args) => {
           const path = args.path.slice(2); // Remove '@/' 
-          return { path: resolve(__dirname, 'dist', path + '.js') };
+          return {path: resolve(__dirname, 'dist', path + '.js')};
         });
       },
     },
@@ -48,11 +44,11 @@ require('reflect-metadata');
   const nativeDest = resolve(__dirname, 'dist', 'build', 'Debug', 'native.node');
   const configSrc = resolve(__dirname, 'config', 'default.json');
   const configDest = resolve(__dirname, 'dist', 'config', 'default.json');
-  
+
   // Create directories
-  fs.mkdirSync(resolve(__dirname, 'dist', 'build', 'Debug'), { recursive: true });
-  fs.mkdirSync(resolve(__dirname, 'dist', 'config'), { recursive: true });
-  
+  fs.mkdirSync(resolve(__dirname, 'dist', 'build', 'Debug'), {recursive: true});
+  fs.mkdirSync(resolve(__dirname, 'dist', 'config'), {recursive: true});
+
   // Copy files
   if (fs.existsSync(nativeSrc)) {
     fs.copyFileSync(nativeSrc, nativeDest);
