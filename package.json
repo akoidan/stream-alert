@@ -25,6 +25,12 @@
       "node20-win-x64"
     ]
   },
+  "binary": {
+    "napi_versions": [
+      8
+    ]
+  },
+  "bin": "dist/main.js",
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@nestjs/testing": "^11.1.8",
