@@ -6,7 +6,7 @@
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
     "types": "node-config-ts",
     "transpile": "nest build",
-    "pkg:win32": "pkg . --targets win --output app.exe",
+    "pkg:win32": "nexe dist/main.js --build --targets windows-x64-20.11.1 --resource node_modules/thread-stream/lib/worker.js --resource build/Debug/server.node",
     "build": "cmake-js build --debug"
   },
   "engines": {
@@ -14,15 +14,12 @@
     "npm": "please-use-yarn",
     "yarn": ">= 1.17.3"
   },
-  "pkg": {
-    "scripts": "dist/main.js",
-    "assets": [
+  "nexe": {
+    "input": "dist/main.js",
+    "resources": [
       "node_modules/thread-stream/lib/worker.js",
       "build/Release/server.node",
       "build/Debug/server.node"
-    ],
-    "targets": [
-      "node20-win-x64"
     ]
   },
   "binary": {
@@ -40,7 +37,7 @@
     "cmake-js": "^7.1.0",
     "node-addon-api": "^8.5.0",
     "npm-run-all": "^4.1.5",
-    "pkg": "^5.8.1",
+    "nexe": "5.0.0-beta.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
