@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <Windows.h>
 
 #pragma comment(lib, "strmiids.lib")
 
@@ -278,41 +279,53 @@ void ConnectSmartTeePreviewBranch(IBaseFilter* smartTeeFilter) {
 }
 
 void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
-    // Configure video window to be hidden before connecting
-    IVideoWindow* videoWindow = nullptr;
-    HRESULT hr = g_graphBuilder->QueryInterface(IID_IVideoWindow, reinterpret_cast<void**>(&videoWindow));
-    if (SUCCEEDED(hr) && videoWindow) {
-        videoWindow->put_AutoShow(OAFALSE);
-        videoWindow->put_Visible(OAFALSE);
-        videoWindow->put_Caption(L"Hidden");
-        videoWindow->Release();
-        std::cout << "[capture] Video window configured to be hidden." << std::endl;
+    // FFmpeg approach: connect device pin directly to capture filter
+    // First, get the device's capture pin
+    IPin* devicePin = nullptr;
+    IEnumPins* pinEnum = nullptr;
+    
+    HRESULT hr = g_videoFilter->EnumPins(&pinEnum);
+    if (FAILED(hr)) {
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to enumerate device pins");
     }
     
-    // Try direct connection first (this was giving better results)
-    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                      g_videoFilter, g_grabberFilter, nullptr);
+    // Find the capture pin
+    PIN_DIRECTION pinDir;
+    while (pinEnum->Next(1, &devicePin, nullptr) == S_OK) {
+        hr = devicePin->QueryDirection(&pinDir);
+        if (SUCCEEDED(hr) && pinDir == PINDIR_OUTPUT) {
+            PIN_INFO pinInfo;
+            hr = devicePin->QueryPinInfo(&pinInfo);
+            if (SUCCEEDED(hr)) {
+                if (pinInfo.dir == PINDIR_OUTPUT) {
+                    // This is an output pin, likely the capture pin
+                    break;
+                }
+            }
+        }
+        devicePin->Release();
+        devicePin = nullptr;
+    }
+    pinEnum->Release();
     
-    if (SUCCEEDED(hr)) {
-        std::cout << "[capture] Direct pipeline connected (no renderer)." << std::endl;
-        return;
+    if (!devicePin) {
+        CleanupDirectShow();
+        ThrowCaptureError(env, "Failed to find device capture pin");
     }
     
-    // If direct fails, fallback to Null Renderer
-    std::cout << "[capture] Direct connection failed, trying with Null Renderer (hr=" 
-              << std::hex << hr << std::dec << ")" << std::endl;
+    // Use FFmpeg's exact RenderStream pattern
+    hr = captureBuilder->RenderStream(NULL, NULL, (IUnknown*)devicePin, 
+                                      NULL, g_grabberFilter);
     
-    IBaseFilter* nullRenderer = CreateAndAddFilter(env, CLSID_NullRenderer, L"Null Renderer", "null renderer");
-    hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                      g_videoFilter, g_grabberFilter, nullRenderer);
-    nullRenderer->Release();
+    devicePin->Release();
     
     if (FAILED(hr)) {
         CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect pipeline with both approaches");
+        ThrowCaptureError(env, "Failed to connect FFmpeg-style pipeline");
     }
     
-    std::cout << "[capture] Pipeline connected with Null Renderer (fallback)." << std::endl;
+    std::cout << "[capture] FFmpeg-style pipeline connected (device pin -> grabber)." << std::endl;
 }
 
 void ConfigureSmartTeePipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {

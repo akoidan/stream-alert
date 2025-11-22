@@ -5,14 +5,14 @@
 static bool g_comInitialized = false;
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
-    // Initialize COM once per module
+    // Initialize COM like FFmpeg does - CoInitialize(0)
     if (!g_comInitialized) {
-        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        HRESULT hr = CoInitialize(0);
         if (hr == S_OK || hr == S_FALSE) {
             g_comInitialized = true;
-            std::cout << "[capture] COM initialized at module level." << std::endl;
+            std::cout << "[capture] COM initialized with CoInitialize(0) like FFmpeg." << std::endl;
         } else {
-            std::cout << "[capture] Failed to initialize COM at module level (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+            std::cout << "[capture] Failed to initialize COM (hr=" << std::hex << hr << std::dec << ")" << std::endl;
         }
     }
     
