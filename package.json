@@ -9,6 +9,7 @@
     "types": "node-ts-config",
     "cmake": "cmake-js build --debug",
     "nest": "nest build",
+    "build": "npm-run-all -s nest esbuild native",
     "esbuild": "node esbuild.config.js",
     "native": "node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
   },
