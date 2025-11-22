@@ -184,100 +184,6 @@ CaptureFormatSelection ConfigureStreamFormat(Napi::Env env, ICaptureGraphBuilder
     return selection;
 }
 
-IBaseFilter* CreateAndAddFilter(Napi::Env env, const CLSID& clsid, const wchar_t* graphName, const char* label) {
-    IBaseFilter* filter = nullptr;
-    HRESULT hr = CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER,
-                                 IID_IBaseFilter, reinterpret_cast<void**>(&filter));
-    if (FAILED(hr)) {
-        CleanupDirectShow();
-        std::string message = std::string("Failed to create ") + label;
-        ThrowCaptureError(env, message.c_str());
-    }
-
-    hr = g_graphBuilder->AddFilter(filter, graphName);
-    if (FAILED(hr)) {
-        filter->Release();
-        CleanupDirectShow();
-        std::string message = std::string("Failed to add ") + label + " to graph";
-        ThrowCaptureError(env, message.c_str());
-    }
-
-    return filter;
-}
-
-void ConnectSmartTeeCaptureBranch(Napi::Env env, IBaseFilter* smartTeeFilter, IBaseFilter* captureSink) {
-    IPin* smartCapturePin = FindPinByName(smartTeeFilter, L"Capture");
-    IPin* sampleGrabberInput = FindPinByDirection(g_grabberFilter, PINDIR_INPUT);
-    IPin* sampleGrabberOutput = FindPinByDirection(g_grabberFilter, PINDIR_OUTPUT);
-    IPin* sinkInput = FindPinByDirection(captureSink, PINDIR_INPUT);
-
-    if (!smartCapturePin || !sampleGrabberInput || !sampleGrabberOutput || !sinkInput) {
-        if (smartCapturePin) smartCapturePin->Release();
-        if (sampleGrabberInput) sampleGrabberInput->Release();
-        if (sampleGrabberOutput) sampleGrabberOutput->Release();
-        if (sinkInput) sinkInput->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to enumerate pins for smart tee capture branch");
-    }
-
-    HRESULT hr = g_graphBuilder->Connect(smartCapturePin, sampleGrabberInput);
-    smartCapturePin->Release();
-    sampleGrabberInput->Release();
-    if (FAILED(hr)) {
-        sampleGrabberOutput->Release();
-        sinkInput->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect smart tee capture pin to sample grabber");
-    }
-
-    hr = g_graphBuilder->Connect(sampleGrabberOutput, sinkInput);
-    sampleGrabberOutput->Release();
-    sinkInput->Release();
-    if (FAILED(hr)) {
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect sample grabber to null renderer");
-    }
-}
-
-void ConnectSmartTeePreviewBranch(IBaseFilter* smartTeeFilter) {
-    IBaseFilter* previewSink = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_NullRenderer, nullptr, CLSCTX_INPROC_SERVER,
-                                 IID_IBaseFilter, reinterpret_cast<void**>(&previewSink));
-    if (FAILED(hr)) {
-        std::cout << "[capture] Failed to create preview null renderer (hr=" << std::hex << hr << std::dec << ")" << std::endl;
-        return;
-    }
-
-    hr = g_graphBuilder->AddFilter(previewSink, L"Preview Null Renderer");
-    if (FAILED(hr)) {
-        std::cout << "[capture] Failed to add preview null renderer to graph (hr=" << std::hex << hr << std::dec << ")" << std::endl;
-        previewSink->Release();
-        return;
-    }
-
-    IPin* smartPreviewPin = FindPinByName(smartTeeFilter, L"Preview");
-    IPin* previewInput = FindPinByDirection(previewSink, PINDIR_INPUT);
-
-    if (!smartPreviewPin || !previewInput) {
-        std::cout << "[capture] Failed to enumerate pins for preview branch." << std::endl;
-        if (smartPreviewPin) smartPreviewPin->Release();
-        if (previewInput) previewInput->Release();
-        previewSink->Release();
-        return;
-    }
-
-    hr = g_graphBuilder->Connect(smartPreviewPin, previewInput);
-    if (SUCCEEDED(hr)) {
-        std::cout << "[capture] Preview branch connected via smart tee." << std::endl;
-    } else {
-        std::cout << "[capture] Preview branch connection failed (hr=" << std::hex << hr << std::dec << ")" << std::endl;
-    }
-
-    smartPreviewPin->Release();
-    previewInput->Release();
-    previewSink->Release();
-}
-
 void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
     // FFmpeg approach: connect device pin directly to capture filter
     // First, get the device's capture pin
@@ -326,25 +232,6 @@ void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilde
     }
     
     std::cout << "[capture] FFmpeg-style pipeline connected (device pin -> grabber)." << std::endl;
-}
-
-void ConfigureSmartTeePipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilder) {
-    IBaseFilter* smartTeeFilter = CreateAndAddFilter(env, CLSID_SmartTee, L"Smart Tee", "smart tee filter");
-
-    HRESULT hr = captureBuilder->RenderStream(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                              g_videoFilter, nullptr, smartTeeFilter);
-    if (FAILED(hr)) {
-        smartTeeFilter->Release();
-        CleanupDirectShow();
-        ThrowCaptureError(env, "Failed to connect smart tee input");
-    }
-
-    IBaseFilter* nullRenderer = CreateAndAddFilter(env, CLSID_NullRenderer, L"Null Renderer", "null renderer");
-    ConnectSmartTeeCaptureBranch(env, smartTeeFilter, nullRenderer);
-    nullRenderer->Release();
-
-    ConnectSmartTeePreviewBranch(smartTeeFilter);
-    smartTeeFilter->Release();
 }
 
 void StartGraphOrThrow(Napi::Env env) {
