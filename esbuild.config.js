@@ -1,6 +1,5 @@
 const esbuild = require('esbuild');
 const {resolve} = require('path');
-const fs = require('fs');
 
 
 esbuild.build({
