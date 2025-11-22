@@ -10,12 +10,6 @@ esbuild.build({
   platform: 'node',
   target: 'node24',
   format: 'cjs',
-  banner: {
-    js: `
-// Enable reflect-metadata for decorators
-require('reflect-metadata');
-`
-  },
   external: [
     'fs', 'path', 'process', 'node:process', 'node:fs', 'node:readline', 'node:module',
     'http', 'https', 'url', 'util', 'stream', 'crypto', 'zlib', 'net', 'tls', 'dns',

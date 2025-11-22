@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import {join} from 'path'
 import * as process from 'node:process';
 
