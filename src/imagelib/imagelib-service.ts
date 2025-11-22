@@ -1,23 +1,40 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {Jimp, JimpInstance} from "jimp";
-import pixelmatch from "pixelmatch";
+import {INativeModule} from '@/native/native-model';
+
 
 @Injectable()
 export class ImagelibService {
-  private oldFrame: JimpInstance | null = null;
+  private processorInitialized: boolean = false;
 
   constructor(
     private readonly logger: Logger,
+    private readonly native: INativeModule,
     private readonly threshold: number,
     public diffThreshold: number,
   ) {
   }
 
+  public initializeProcessor(): void {
+    this.native.createProcessor();
+    this.processorInitialized = true;
+    this.logger.log('✅ Native image processor initialized');
+  }
+
   async getLastImage(): Promise<Buffer | null> {
-    if (this.oldFrame) {
-      return this.oldFrame.getBuffer('image/jpeg');
+    if (!this.processorInitialized) {
+      this.logger.warn('Image processor not initialized');
+      return null;
     }
-    return null;
+    
+    try {
+      console.time("nativeGetLastFrame");
+      const result = this.native.getLastFrame();
+      console.timeEnd("nativeGetLastFrame");
+      return result;
+    } catch (error) {
+      this.logger.error('Error getting last frame:', error);
+      return null;
+    }
   }
 
   async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
@@ -25,30 +42,24 @@ export class ImagelibService {
       return null;
     }
 
-    
-    let newFrame: JimpInstance = await Jimp.read(frameData) as JimpInstance;
-
-    if (!this.oldFrame) {
-      this.oldFrame = newFrame;
+    if (!this.processorInitialized) {
+      this.logger.error('Image processor not initialized, cannot process frame');
       return null;
     }
-    const {width, height} = newFrame.bitmap;
 
-    const diffPixels = pixelmatch(
-      newFrame.bitmap.data as Uint8Array,
-      this.oldFrame.bitmap.data as Uint8Array,
-      null!,
-      width,
-      height,
-      {threshold: this.threshold}
-    );
-    this.oldFrame = newFrame as JimpInstance;
-
-    if (diffPixels > this.diffThreshold) {
-      this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels}`);
-      return await newFrame.getBuffer('image/jpeg');
-    } else {
-      return null
+    try {
+      console.time("nativeProcessFrame");
+      const result = this.native.processFrame(frameData);
+      console.timeEnd("nativeProcessFrame");
+      
+      if (result) {
+        this.logger.log(`⚠️ CHANGE DETECTED: ${result.length} bytes`);
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger.error('Error processing frame:', error);
+      return null;
     }
   }
 }
