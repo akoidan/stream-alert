@@ -21,10 +21,9 @@ export class StreamService {
     this.captureService.start(this.cameraName, this.frameRate, async (frameInfo: any) => {
       clearTimeout(this.exitTimeout!);
       this.exitOnTimeout()
-      const frameData = this.captureService.getFrame();
-      if (frameData) {
+      if (frameInfo) {
         process.stdout.write(".");
-        await frameListener.onNewFrame(frameData);
+        await frameListener.onNewFrame(frameInfo);
       }
     });
     this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
