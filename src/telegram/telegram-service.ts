@@ -1,8 +1,9 @@
-import {Injectable, Logger} from '@nestjs/common';
+import {Inject, Injectable, Logger} from '@nestjs/common';
 import {Telegraf} from "telegraf";
-import {TelegramCommands} from "@/telegram/telegram-model";
+import {TelegramCommands, TelegramConfig} from "@/telegram/telegram-model";
 import type {TgCommandsExecutor} from "@/app/app-model";
 import {CommandContextExtn} from "telegraf/typings/telegram-types";
+import {Telegram} from "node-ts-config";
 
 @Injectable()
 export class TelegramService {
@@ -11,9 +12,8 @@ export class TelegramService {
   constructor(
     private readonly logger: Logger,
     private readonly bot: Telegraf,
-    private readonly chatId: number,
-    private readonly tgMessage: string,
-    private readonly spamDelay: number,
+    @Inject(TelegramConfig)
+    private readonly tgConfig: Telegram,
   ) {
   }
 
@@ -33,14 +33,14 @@ export class TelegramService {
   }
 
   async sendText(text: string): Promise<void> {
-    await this.bot.telegram.sendMessage(this.chatId, text);
+    await this.bot.telegram.sendMessage(this.tgConfig.chatId, text);
   }
 
   async sendImage(data: Buffer): Promise<void> {
     const newNotificationTime = Date.now();
     const diffDate = newNotificationTime - this.lastNotificationTime;
-    if (diffDate > this.spamDelay) {
-      await this.bot.telegram.sendPhoto(this.chatId, {source: data}, {caption: this.tgMessage});
+    if (diffDate > this.tgConfig.spamDelay) {
+      await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
       this.lastNotificationTime = newNotificationTime;
       this.logger.log("Notification sent");
     } else {

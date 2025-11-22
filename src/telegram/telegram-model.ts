@@ -4,3 +4,5 @@ export enum TelegramCommands {
   increase_threshold = "increase_threshold",
   decrease_threshold = "decrease_threshold",
 }
+
+export const TelegramConfig = 'TelegramConfig';

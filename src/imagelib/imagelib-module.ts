@@ -4,18 +4,17 @@ import {config} from 'node-ts-config'
 import {ImagelibService} from "@/imagelib/imagelib-service";
 import {INativeModule, Native} from "@/native/native-model";
 import {NativeModule} from "@/native/native-module";
+import {imageLibConf} from "@/imagelib/imagelib-model";
 
 @Module({
   imports: [NativeModule],
   providers: [
     Logger,
     {
-      provide: ImagelibService,
-      useFactory: function (logger: Logger, native: INativeModule) {
-        return new ImagelibService(logger, native, config.threshold, config.diffThreshold)
-      },
-      inject: [Logger, Native],
-    }
+      provide: imageLibConf,
+      useValue: config.diff,
+    },
+    ImagelibService,
   ],
   exports: [ImagelibService]
 })

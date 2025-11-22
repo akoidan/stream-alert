@@ -1,5 +1,7 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {FrameData, INativeModule} from '@/native/native-model';
+import {Inject, Injectable, Logger} from '@nestjs/common';
+import {FrameData, INativeModule, Native} from '@/native/native-model';
+import {Diff} from "node-ts-config";
+import {imageLibConf} from "@/imagelib/imagelib-model";
 
 
 @Injectable()
@@ -8,9 +10,10 @@ export class ImagelibService {
 
   constructor(
     private readonly logger: Logger,
+    @Inject(Native)
     private readonly native: INativeModule,
-    private readonly threshold: number,
-    public diffThreshold: number,
+    @Inject(imageLibConf)
+    public readonly conf: Diff,
   ) {
   }
 
@@ -37,10 +40,10 @@ export class ImagelibService {
       frameData.buffer, 
       frameData.width, 
       frameData.height, 
-      this.threshold
+      this.conf.threshold
     );
     
-    if (diffPixels < this.diffThreshold) {
+    if (diffPixels < this.conf.pixels) {
       return null;
     }
     

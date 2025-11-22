@@ -3,7 +3,7 @@ import {Logger, Module} from '@nestjs/common';
 import {config} from 'node-ts-config'
 import {StreamService} from "@/stream/stream-service";
 import {NativeModule} from "@/native/native-module";
-import {INativeModule, Native} from "@/native/native-model";
+import {CameraConf} from "@/stream/stream-model";
 
 @Module({
   imports: [NativeModule],
@@ -11,17 +11,10 @@ import {INativeModule, Native} from "@/native/native-model";
   providers: [
     Logger,
     {
-      provide: StreamService,
-      useFactory: function (logger: Logger, native: INativeModule) {
-        return new StreamService(
-          logger,
-          native,
-          config.camera,
-          config.frameRate,
-        )
-      },
-      inject: [Logger, Native],
-    }
+      provide: CameraConf,
+      useValue: config.camera
+    },
+    StreamService,
   ],
 })
 export class StreamModule {

@@ -1,6 +1,8 @@
-import {Injectable, Logger} from '@nestjs/common';
+import {Inject, Injectable, Logger} from '@nestjs/common';
 import type {FrameDetector} from "@/app/app-model";
-import {INativeModule} from "@/native/native-model";
+import {INativeModule, Native} from "@/native/native-model";
+import {Camera} from "node-ts-config";
+import {CameraConf} from "@/stream/stream-model";
 
 @Injectable()
 export class StreamService {
@@ -9,16 +11,17 @@ export class StreamService {
 
   constructor(
     private readonly logger: Logger,
+    @Inject(Native)
     private readonly captureService: INativeModule,
-    private readonly cameraName: string,
-    private readonly frameRate: number,
+    @Inject(CameraConf)
+    private readonly conf: Camera,
   ) {
   }
 
   async listen(frameListener: FrameDetector): Promise<void> {
     // Start capture with the new API - pass the callback directly
     this.exitOnTimeout();
-    this.captureService.start(this.cameraName, this.frameRate, async (frameInfo: any) => {
+    this.captureService.start(this.conf.name, this.conf.frameRate, async (frameInfo: any) => {
       clearTimeout(this.exitTimeout!);
       this.exitOnTimeout()
       if (frameInfo) {
@@ -26,7 +29,7 @@ export class StreamService {
         await frameListener.onNewFrame(frameInfo);
       }
     });
-    this.logger.log(`DirectShow capture started for device: ${this.cameraName}`);
+    this.logger.log(`DirectShow capture started for device: ${this.conf.name}`);
   }
 
   private exitOnTimeout() {
