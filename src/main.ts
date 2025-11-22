@@ -1,6 +1,9 @@
+import {join} from 'path'
+import * as process from 'node:process';
+process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config')
+
 import {NestFactory} from '@nestjs/core';
 import {CustomLogger} from '@/app/custom-logger';
-import * as process from 'node:process';
 import {AppModule} from "@/app/app-module";
 
 const customLogger = new CustomLogger();
