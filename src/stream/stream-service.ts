@@ -1,56 +1,40 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {spawn} from "child_process";
+import {Inject, Injectable, Logger} from '@nestjs/common';
 import type {FrameDetector} from "@/app/app-model";
+import {INativeModule, Native} from "@/native/native-model";
+import type {Camera} from "node-ts-config";
+import {CameraConf} from "@/config-resolve/config-resolve-model";
 
 @Injectable()
 export class StreamService {
 
-  private buffer: Buffer = Buffer.alloc(0);
-  private readonly ffmpegArgs: string[];
+  private exitTimeout: NodeJS.Timeout| null = null;
 
   constructor(
     private readonly logger: Logger,
-    cameraName: string,
-    frameRate: number,
+    @Inject(Native)
+    private readonly captureService: INativeModule,
+    @Inject(CameraConf)
+    private readonly conf: Camera,
   ) {
-    this.ffmpegArgs = [
-      "-f", "dshow",
-      "-i", `video=${cameraName}`,
-      "-r", `${frameRate}`,
-      "-vcodec", "mjpeg",
-      "-f", "image2pipe",
-      "-"
-    ]
   }
 
   async listen(frameListener: FrameDetector): Promise<void> {
-    const ff = spawn("ffmpeg", this.ffmpegArgs);
-
-    ff.stderr.on("data", d => {
-      const data = String(d);
-      if (!data.startsWith("frame=")) {
-        console.error(data);
+    // Start capture with the new API - pass the callback directly
+    this.exitOnTimeout();
+    this.captureService.start(this.conf.name, this.conf.frameRate, async (frameInfo: any) => {
+      clearTimeout(this.exitTimeout!);
+      this.exitOnTimeout()
+      if (frameInfo) {
+        process.stdout.write(".");
+        await frameListener.onNewFrame(frameInfo);
       }
     });
+    this.logger.log(`DirectShow capture started for device: ${this.conf.name}`);
+  }
 
-    ff.stdout.on("data", async chunk => {
-      process.stdout.write(".");
-      try {
-        this.buffer = Buffer.concat([this.buffer, chunk]);
-
-        // Look for JPEG frame boundaries
-        const SOI = this.buffer.indexOf(Buffer.from([0xFF, 0xD8]) as Uint8Array); // Start of Image
-        const EOI = this.buffer.indexOf(Buffer.from([0xFF, 0xD9]) as Uint8Array); // End of Image
-
-        if (SOI === -1 || EOI === -1 || EOI < SOI) {
-          return;
-        }
-        const frameData = this.buffer.slice(SOI, EOI + 2);
-        this.buffer = this.buffer.slice(EOI + 2);
-        await frameListener.onNewFrame(frameData);
-      } catch (err) {
-        this.logger.error("Failed to parse frame", err);
-      }
-    })
+  private exitOnTimeout() {
+    this.exitTimeout = setTimeout(() => {
+      throw Error("Frame capturing didn't produce any data for 5s, exiting...")
+    }, 5000);
   }
 }

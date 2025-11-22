@@ -1,7 +1,8 @@
 import {CommandContextExtn} from "telegraf/typings/telegram-types";
+import {FrameData} from "@/native/native-model";
 
 interface FrameDetector {
-  onNewFrame(frameData: Buffer<ArrayBuffer>): Promise<void>;
+  onNewFrame(frameData: FrameData): Promise<void>;
 }
 
 

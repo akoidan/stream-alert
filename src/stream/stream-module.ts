@@ -1,23 +1,15 @@
-/// <reference path="../../config/Config.d.ts" />
+/// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
-import {config} from 'node-config-ts'
 import {StreamService} from "@/stream/stream-service";
+import {NativeModule} from "@/native/native-module";
+import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
 
 @Module({
+  imports: [NativeModule, ConfigResolveModule],
   exports: [StreamService],
   providers: [
     Logger,
-    {
-      provide: StreamService,
-      useFactory: function (logger: Logger) {
-        return new StreamService(
-          logger,
-          config.camera,
-          config.frameRate,
-        )
-      },
-      inject: [Logger],
-    }
+    StreamService,
   ],
 })
 export class StreamModule {

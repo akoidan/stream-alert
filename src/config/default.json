@@ -1,7 +1,7 @@
 {
   "telegram": {
-    "token": "3",
-    "chatId": 3,
+    "token": "@@TG_TOKEN",
+    "chatId": "@@TG_CHAT_ID",
     "spamDelay": 10000,
     "message": "Changes detected"
   },
@@ -11,6 +11,6 @@
   },
   "diff": {
     "pixels": 1000,
-    "threshold": 0
+    "threshold": 0.0
   }
 }

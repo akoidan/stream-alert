@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2016",
+    "target": "es2020",
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -8,6 +8,7 @@
       ]
     },
     "module": "commonjs",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -15,7 +16,7 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": "src"
   },
-  "include": ["."]
+  "include": ["src/**/*"]
 }

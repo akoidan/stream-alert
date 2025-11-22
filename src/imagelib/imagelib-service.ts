@@ -1,49 +1,56 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {Jimp, JimpInstance} from "jimp";
-import pixelmatch from "pixelmatch";
+import {Inject, Injectable, Logger} from '@nestjs/common';
+import {FrameData, INativeModule, Native} from '@/native/native-model';
+import type {Diff} from "node-ts-config";
+import {DiffConf} from "@/config-resolve/config-resolve-model";
 
 @Injectable()
 export class ImagelibService {
-  private oldFrame: JimpInstance | null = null;
+  private oldFrame: FrameData | null = null;
 
   constructor(
     private readonly logger: Logger,
-    private readonly threshold: number,
-    public diffThreshold: number,
+    @Inject(Native)
+    private readonly native: INativeModule,
+    @Inject(DiffConf)
+    public readonly conf: Diff,
   ) {
   }
 
   async getLastImage(): Promise<Buffer | null> {
-    if (this.oldFrame) {
-      return this.oldFrame.getBuffer('image/jpeg');
-    }
-    return null;
-  }
-
-  async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
-    const newFrame = await Jimp.read(frameData);
-
     if (!this.oldFrame) {
-      this.oldFrame = newFrame as JimpInstance;
       return null;
     }
-    const {width, height} = newFrame.bitmap;
 
-    const diffPixels = pixelmatch(
-      newFrame.bitmap.data as Uint8Array,
-      this.oldFrame.bitmap.data as Uint8Array,
-      null!,
-      width,
-      height,
-      {threshold: this.threshold}
-    );
-    this.oldFrame = newFrame as JimpInstance;
+    return await this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
+  }
 
-    if (diffPixels > this.diffThreshold) {
-      this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels}`);
-      return await newFrame.getBuffer('image/jpeg');
-    } else {
-      return null
+  async getImageIfItsChanged(frameData: FrameData): Promise<Buffer | null> {
+    if (!frameData || !frameData.buffer || frameData.buffer.length === 0) {
+      return null;
     }
+
+    if (!this.oldFrame) {
+      this.oldFrame = frameData;
+      return null;
+    }
+
+    const diffPixels = await this.native.compareRgbImages(
+      this.oldFrame.buffer,
+      frameData.buffer,
+      frameData.width,
+      frameData.height,
+      this.conf.threshold
+    );
+
+    if (diffPixels < this.conf.pixels) {
+      return null;
+    }
+
+    this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
+
+    const jpegBuffer = await this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);
+
+    this.oldFrame = frameData;
+    return jpegBuffer;
   }
 }

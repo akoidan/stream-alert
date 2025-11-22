@@ -2,30 +2,55 @@
   "name": "stream-alert",
   "version": "1.0.0",
   "description": "",
+  "license": "MIT",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "typess": "node-config-ts"
+    "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
+    "types": "node-ts-config",
+    "cmake": "cmake-js build --debug",
+    "nest": "nest build",
+    "build": "npm-run-all -s nest esbuild native",
+    "esbuild": "node esbuild.config.js",
+    "native": "node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
   },
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "npm": "please-use-yarn",
+    "yarn": ">= 1.17.3"
+  },
+  "binary": {
+    "napi_versions": [
+      8
+    ]
+  },
+  "bin": "dist/main.js",
   "devDependencies": {
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "@nestjs/cli": "^11.0.10",
-    "@nestjs/testing": "^11.1.8",
+    "@nestjs/cli": "^10",
+    "@nestjs/testing": "^10",
+    "@types/bindings": "^1.5.5",
     "@types/cli-color": "^2.0.6",
-    "@types/node": "^24.10.0",
-    "tsconfig-paths": "^4.2.0"
+    "@types/node": "^24.10.1",
+    "cmake-js": "^7.1.0",
+    "esbuild": "^0.27.0",
+    "node-addon-api": "^8.5.0",
+    "npm-run-all": "^4.1.5",
+    "postject": "^1.0.0-alpha.6",
+    "ts-loader": "^9.5.4",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.8",
+    "@nestjs/common": "^10.4.15",
     "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^11.1.8",
+    "@nestjs/core": "^10.4.15",
+    "@nestjs/platform-express": "^10.4.15",
+    "bindings": "^1.5.0",
     "cli-color": "^2.0.4",
-    "openai": "^6.8.1",
+    "node-ts-config": "^1.1.0",
+    "prompts": "^2.4.2",
     "reflect-metadata": "^0.2.2",
-    "jimp": "^1.6.0",
-    "node-config-ts": "^3.3.1",
-    "pixelmatch": "^7.1.0",
-    "telegraf": "^4.16.3",
-    "ts-node": "^10.9.2"
+    "rxjs": "7.1.0",
+    "telegraf": "^4.16.3"
   }
 }

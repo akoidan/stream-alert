@@ -1,12 +1,18 @@
 /* tslint:disable */
 /* eslint-disable */
-declare module "node-config-ts" {
+declare module "node-ts-config" {
   interface IConfig {
     telegram: Telegram
-    camera: string
-    frameRate: number
-    diffThreshold: number
+    camera: Camera
+    diff: Diff
+  }
+  interface Diff {
+    pixels: number
     threshold: number
+  }
+  interface Camera {
+    name: string
+    frameRate: number
   }
   interface Telegram {
     token: string

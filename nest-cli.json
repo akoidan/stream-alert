@@ -1,0 +1,10 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "entryFile": "sea",
+  "compilerOptions": {
+    "assets": ["../build/Debug/native.node", "config/default.json"],
+    "deleteOutDir": true,
+    "watchAssets": true
+  }
+}
