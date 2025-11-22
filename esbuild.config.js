@@ -1,21 +1,21 @@
 const esbuild = require('esbuild');
 const { resolve } = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
+
+// First compile with NestJS to preserve decorators/metadata
+console.log('Compiling TypeScript with NestJS...');
+execSync('yarn nest build', { stdio: 'inherit' });
 
 esbuild.build({
-  entryPoints: [resolve(__dirname, 'src/main.ts')],
+  entryPoints: [resolve(__dirname, 'dist/main.js')],
   bundle: true,
   outfile: resolve(__dirname, 'dist/sea-bundle.js'),
   platform: 'node',
   target: 'node24',
   format: 'cjs',
-  tsconfig: resolve(__dirname, 'tsconfig.json'),
-  resolveExtensions: ['.ts', '.js'],
   banner: {
     js: `
-// Fix import.meta for CJS
-globalThis.import = globalThis.import || {};
-globalThis.import.meta = globalThis.import.meta || { url: 'file://' + __filename };
 // Enable reflect-metadata for decorators
 require('reflect-metadata');
 `
@@ -36,7 +36,7 @@ require('reflect-metadata');
       setup(build) {
         build.onResolve({ filter: /^@\/(.*)$/ }, (args) => {
           const path = args.path.slice(2); // Remove '@/' 
-          return { path: resolve(__dirname, 'src', path + '.ts') };
+          return { path: resolve(__dirname, 'dist', path + '.js') };
         });
       },
     },
