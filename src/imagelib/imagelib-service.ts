@@ -25,16 +25,12 @@ export class ImagelibService {
       this.logger.warn('Image processor not initialized');
       return null;
     }
-    
-    try {
-      console.time("nativeGetLastFrame");
-      const result = this.native.getLastFrame();
-      console.timeEnd("nativeGetLastFrame");
-      return result;
-    } catch (error) {
-      this.logger.error('Error getting last frame:', error);
-      return null;
-    }
+
+    console.time("nativeGetLastFrame");
+    const result = this.native.getLastFrame();
+    console.timeEnd("nativeGetLastFrame");
+    return result;
+
   }
 
   async getImageIfItsChanged(frameData: Buffer<ArrayBuffer>): Promise<Buffer | null> {
@@ -42,24 +38,11 @@ export class ImagelibService {
       return null;
     }
 
-    if (!this.processorInitialized) {
-      this.logger.error('Image processor not initialized, cannot process frame');
-      return null;
-    }
+    const result = this.native.processFrame(frameData);
 
-    try {
-      console.time("nativeProcessFrame");
-      const result = this.native.processFrame(frameData);
-      console.timeEnd("nativeProcessFrame");
-      
-      if (result) {
-        this.logger.log(`⚠️ CHANGE DETECTED: ${result.length} bytes`);
-      }
-      
-      return result;
-    } catch (error) {
-      this.logger.error('Error processing frame:', error);
-      return null;
+    if (result) {
+      this.logger.log(`⚠️ CHANGE DETECTED: ${result.length} bytes`);
     }
+    return result;
   }
 }

@@ -22,7 +22,7 @@ ImageProcessor::ImageProcessor() : threshold_(0.1), diffThreshold_(1000) {
 ImageProcessor::~ImageProcessor() {
 }
 
-// Simple BMP decoder for 24-bit BMPs
+// Simple BMP decoder for 24-bit BMPs (standard bottom-up format)
 std::unique_ptr<ImageProcessor::SimpleImage> ImageProcessor::DecodeBMP(const unsigned char* buffer, size_t length) {
     if (length < 54) return nullptr; // BMP header is 54 bytes
     
@@ -45,7 +45,7 @@ std::unique_ptr<ImageProcessor::SimpleImage> ImageProcessor::DecodeBMP(const uns
     
     // Copy pixel data (BMP is stored bottom-to-top, BGR format)
     for (int y = 0; y < img->height; y++) {
-        int srcY = img->height - 1 - y; // Flip vertically
+        int srcY = img->height - 1 - y; // Flip vertically for bottom-up BMP
         size_t srcOffset = dataOffset + srcY * rowSize;
         size_t dstOffset = y * img->width * 3;
         
@@ -131,9 +131,20 @@ Napi::Value ImageProcessor::ProcessFrame(const Napi::CallbackInfo& info) {
     
     Napi::Buffer<unsigned char> buffer = info[0].As<Napi::Buffer<unsigned char>>();
     
+    // Safety check: reject buffers that are too large
+    if (buffer.Length() > 50 * 1024 * 1024) { // 50MB limit
+        Napi::Error::New(env, "Buffer too large").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    
     // Decode BMP
     auto newFrame = DecodeBMP(buffer.Data(), buffer.Length());
     if (!newFrame) {
+        return env.Null();
+    }
+    
+    // Safety check: reject images that are too large
+    if (newFrame->width > 10000 || newFrame->height > 10000) {
         return env.Null();
     }
     

@@ -32,7 +32,7 @@ void ConfigureBitmapInfo(const BITMAPINFOHEADER& header, DWORD imageSize) {
     g_bitmapInfoHeader = {};
     g_bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
     g_bitmapInfoHeader.biWidth = header.biWidth;
-    g_bitmapInfoHeader.biHeight = -header.biHeight; // Negative height for top-down bitmap
+    g_bitmapInfoHeader.biHeight = header.biHeight; // Use positive height for standard bottom-up BMP
     g_bitmapInfoHeader.biPlanes = 1;
     g_bitmapInfoHeader.biBitCount = header.biBitCount ? header.biBitCount : 24;
     g_bitmapInfoHeader.biCompression = header.biCompression;
@@ -79,9 +79,11 @@ void ConvertYuy2ToRgb24(const uint8_t* src, int width, int height, std::vector<u
     dst.resize(static_cast<size_t>(width) * absHeight * 3);
     int srcStride = width * 2;
     int dstStride = width * 3;
+    
+    // Convert to bottom-up BMP format (standard BMP format)
     for (int y = 0; y < absHeight; ++y) {
         const uint8_t* srcRow = src + y * srcStride;
-        uint8_t* dstRow = dst.data() + y * dstStride;
+        uint8_t* dstRow = dst.data() + (absHeight - 1 - y) * dstStride; // Flip vertically for bottom-up
         for (int x = 0; x < width; x += 2) {
             int idx = x * 2;
             int y0 = srcRow[idx + 0];
