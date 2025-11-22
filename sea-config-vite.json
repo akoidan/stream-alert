@@ -1,4 +1,0 @@
-{
-  "main": "dist/bundle.js",
-  "output": "sea-prep-vite.blob"
-}
