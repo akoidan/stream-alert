@@ -4,6 +4,7 @@
 #include "headers/capture_device.h"
 #include "headers/capture_callback.h"
 #include "headers/capture_format.h"
+#include "../logger.h"
 
 #include <chrono>
 #include <iostream>
@@ -150,14 +151,14 @@ void ConfigureSampleGrabberOptions(Napi::Env env) {
     }
     
     // Add this - FFmpeg might use different callback methods
-    std::cout << "[capture] SampleGrabber configured with buffer samples=TRUE, one-shot=FALSE" << std::endl;
+    LOG_MAIN("SampleGrabber configured with buffer samples=TRUE, one-shot=FALSE");
 }
 
 void RegisterSampleCallback(Napi::Env env) {
     HRESULT hr = g_sampleGrabber->SetCallback(&g_callback, 0);
     if (FAILED(hr)) {
-        std::cout << "[capture] SampleCB registration failed (hr=" << std::hex << hr << std::dec
-                  << "), retrying BufferCB." << std::endl;
+        LOG_MAIN("SampleCB registration failed (hr=" << std::hex << hr << std::dec
+                  << "), retrying BufferCB.");
         hr = g_sampleGrabber->SetCallback(&g_callback, 1);
     }
 
@@ -177,7 +178,7 @@ CaptureFormatSelection ConfigureStreamFormat(Napi::Env env, ICaptureGraphBuilder
         selection = SelectCaptureFormat(streamConfig);
         streamConfig->Release();
     } else {
-        std::cout << "[capture] IAMStreamConfig not available (hr=" << std::hex << hr << std::dec << ")." << std::endl;
+        LOG_MAIN("IAMStreamConfig not available (hr=" << std::hex << hr << std::dec << ").");
     }
 
     ConfigureSampleGrabberMediaType(env, selection, fps);
@@ -233,7 +234,7 @@ void ConfigureDirectPipeline(Napi::Env env, ICaptureGraphBuilder2* captureBuilde
         ThrowCaptureError(env, "Failed to connect FFmpeg-style pipeline");
     }
     
-    std::cout << "[capture] FFmpeg-style pipeline connected (device pin -> grabber)." << std::endl;
+    LOG_MAIN("FFmpeg-style pipeline connected (device pin -> grabber).");
 }
 
 void StartGraphOrThrow(Napi::Env env) {
@@ -243,16 +244,16 @@ void StartGraphOrThrow(Napi::Env env) {
         ThrowCaptureError(env, "Failed to run graph");
     }
 
-    std::cout << "[capture] Graph run request succeeded." << std::endl;
+    LOG_MAIN("Graph run request succeeded.");
 
     OAFilterState graphState = State_Stopped;
     HRESULT stateHr = g_mediaControl->GetState(5000, &graphState);
     if (SUCCEEDED(stateHr)) {
         const char* stateStr = graphState == State_Running ? "Running"
                                 : graphState == State_Paused ? "Paused" : "Stopped";
-        std::cout << "[capture] Graph state after Run(): " << stateStr << std::endl;
+        LOG_MAIN("Graph state after Run(): " << stateStr);
     } else {
-        std::cout << "[capture] GetState after Run failed (hr=" << std::hex << stateHr << std::dec << ")." << std::endl;
+        LOG_MAIN("GetState after Run failed (hr=" << std::hex << stateHr << std::dec << ").");
     }
 }
 
@@ -260,10 +261,10 @@ void CacheConnectedMediaTypeOrThrow(Napi::Env env) {
     DexterLib::_AMMediaType connectedMt;
     HRESULT hr = g_sampleGrabber->GetConnectedMediaType(&connectedMt);
     if (SUCCEEDED(hr)) {
-        std::cout << "[capture] Connected media type GUID: " << GuidToString(connectedMt.formattype)
-                  << ", cbFormat=" << connectedMt.cbFormat << std::endl;
+        LOG_MAIN("Connected media type GUID: " << GuidToString(connectedMt.formattype)
+                  << ", cbFormat=" << connectedMt.cbFormat);
     } else {
-        std::cout << "[capture] Failed to retrieve connected media type (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+        LOG_MAIN("Failed to retrieve connected media type (hr=" << std::hex << hr << std::dec << ")");
     }
 
     g_hasMediaInfo = false;
@@ -284,8 +285,8 @@ void CacheConnectedMediaTypeOrThrow(Napi::Env env) {
     }
 
     if (!g_hasMediaInfo) {
-        std::cout << "[capture] No supported media info detected for GUID "
-                  << GuidToString(connectedMt.formattype) << "." << std::endl;
+        LOG_MAIN("No supported media info detected for GUID "
+                  << GuidToString(connectedMt.formattype) << ".");
         CleanupDirectShow();
         ThrowCaptureError(env, "Connected media type is not supported");
     }
@@ -299,9 +300,9 @@ void InitializeCOM() {
         HRESULT hr = CoInitialize(0);
         if (hr == S_OK || hr == S_FALSE) {
             g_comInitialized = true;
-            std::cout << "[capture] COM initialized with CoInitialize(0) like FFmpeg." << std::endl;
+            LOG_MAIN("COM initialized with CoInitialize(0) like FFmpeg.");
         } else {
-            std::cout << "[capture] Failed to initialize COM (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+            LOG_MAIN("Failed to initialize COM (hr=" << std::hex << hr << std::dec << ")");
         }
     }
 }
@@ -310,7 +311,7 @@ void CleanupCOM() {
     if (g_comInitialized) {
         CoUninitialize();
         g_comInitialized = false;
-        std::cout << "[capture] COM uninitialized at module cleanup." << std::endl;
+        LOG_MAIN("COM uninitialized at module cleanup.");
     }
 }
 
@@ -337,7 +338,7 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
     CacheConnectedMediaTypeOrThrow(env);
 
     g_isCapturing = true;
-    std::cout << "[capture] Capture pipeline active." << std::endl;
+    LOG_MAIN("Capture pipeline active.");
 }
 
 // Stop capture

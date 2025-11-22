@@ -1,5 +1,6 @@
 #include "headers/capture_callback.h"
 #include "headers/capture_media.h"
+#include "../logger.h"
 
 #include <iostream>
 #include <memory>
@@ -44,8 +45,8 @@ HRESULT SampleGrabberCallback::ProcessBuffer(double sampleTime, BYTE* pBuffer, l
 
     auto sampleIndex = ++g_rawSamples;
     if (sampleIndex <= 5) {
-        std::cout << "[capture] SampleGrabber sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
-                  << ", sampleTime=" << sampleTime << std::endl;
+        LOG_MAIN("SampleGrabber sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
+                  << ", sampleTime=" << sampleTime);
     }
 
     if (!HasValidMediaInfo()) {
@@ -84,7 +85,7 @@ bool SampleGrabberCallback::ValidateCaptureState() {
     }
 
     if (!loggedInactive.exchange(true)) {
-        std::cout << "[capture] SampleGrabber invoked while g_isCapturing=false (dropping frames)" << std::endl;
+        LOG_MAIN("SampleGrabber invoked while g_isCapturing=false (dropping frames)");
     }
     return false;
 }
@@ -97,7 +98,7 @@ bool SampleGrabberCallback::HasValidMediaInfo() {
     }
 
     if (!loggedNoMediaInfo.exchange(true)) {
-        std::cout << "[capture] SampleGrabber received data before media info configured; dropping sample." << std::endl;
+        LOG_MAIN("SampleGrabber received data before media info configured; dropping sample.");
     }
     return false;
 }
@@ -110,7 +111,7 @@ bool SampleGrabberCallback::ValidateSampleSize(long dataSize) {
     }
 
     if (!loggedEmptySample.exchange(true)) {
-        std::cout << "[capture] SampleGrabber reported zero-length sample; waiting for valid buffers." << std::endl;
+        LOG_MAIN("SampleGrabber reported zero-length sample; waiting for valid buffers.");
     }
     return false;
 }
@@ -136,8 +137,8 @@ void SampleGrabberCallback::DispatchFrame(const BITMAPINFOHEADER& infoHeader) {
         auto sampleIndex = g_rawSamples.load();
         if (sampleIndex % 30 == 0) {
             auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(interval - (now - g_lastCallbackTime)).count();
-            std::cout << "[capture] Dropping frame due to FPS gate. sampleIndex=" << sampleIndex
-                      << ", waiting ~" << waitMs << "ms" << std::endl;
+            LOG_MAIN("Dropping frame due to FPS gate. sampleIndex=" << sampleIndex
+                      << ", waiting ~" << waitMs << "ms");
         }
         return;
     }
@@ -152,14 +153,13 @@ void SampleGrabberCallback::DispatchFrame(const BITMAPINFOHEADER& infoHeader) {
     auto frameHeight = g_frameHeight > 0 ? g_frameHeight : infoHeader.biHeight;
 
     g_callbackFunction.NonBlockingCall([frameCopy, frameWidth, frameHeight](Napi::Env env, Napi::Function jsCallback) {
-        Napi::Object frameInfo = Napi::Object::New(env);
-        frameInfo.Set("width", Napi::Number::New(env, frameWidth));
-        frameInfo.Set("height", Napi::Number::New(env, frameHeight));
-        frameInfo.Set("dataSize", Napi::Number::New(env, frameCopy->size()));
+        Napi::Object frameData = Napi::Object::New(env);
+        frameData.Set("width", Napi::Number::New(env, frameWidth));
+        frameData.Set("height", Napi::Number::New(env, frameHeight));
 
         Napi::Buffer<uint8_t> frameBuffer = Napi::Buffer<uint8_t>::Copy(env, frameCopy->data(), frameCopy->size());
-        frameInfo.Set("data", frameBuffer);
+        frameData.Set("buffer", frameBuffer);
 
-        jsCallback.Call({frameInfo});
+        jsCallback.Call({frameData});
     });
 }

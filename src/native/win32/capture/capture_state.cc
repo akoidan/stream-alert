@@ -1,4 +1,5 @@
 #include "headers/capture_state.h"
+#include "../logger.h"
 #include <Windows.h>
 #include <iostream>
 
@@ -61,11 +62,11 @@ void ResetFrameMetadata() {
 }
 
 void CleanupDirectShow() {
-    std::cout << "[capture] Starting DirectShow cleanup..." << std::endl;
+    LOG_MAIN("Starting DirectShow cleanup...");
     
     if (g_mediaControl) {
         HRESULT hr = g_mediaControl->Stop();
-        std::cout << "[capture] MediaControl::Stop() returned hr=" << std::hex << hr << std::dec << std::endl;
+        LOG_MAIN("MediaControl::Stop() returned hr=" << std::hex << hr << std::dec);
         
         // Quick wait for stop - don't wait too long to avoid OBS Virtual Camera reset
         OAFilterState state = State_Running;
@@ -75,7 +76,7 @@ void CleanupDirectShow() {
             attempts++;
         }
         
-        std::cout << "[capture] Graph stop completed after " << attempts << " attempts, final state: " << state << std::endl;
+        LOG_MAIN("Graph stop completed after " << attempts << " attempts, final state: " << state);
     }
     
     // Minimal delay - just enough for basic cleanup
@@ -88,5 +89,5 @@ void CleanupDirectShow() {
     ReleaseComPtr(g_grabberFilter);
     ResetFrameMetadata();
     
-    std::cout << "[capture] DirectShow cleanup completed." << std::endl;
+    LOG_MAIN("DirectShow cleanup completed.");
 }

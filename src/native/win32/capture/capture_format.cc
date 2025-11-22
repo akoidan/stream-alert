@@ -1,5 +1,6 @@
 #include "headers/capture_format.h"
 #include "headers/capture_media.h"
+#include "../logger.h"
 
 #include <iostream>
 #include <vector>
@@ -10,24 +11,24 @@ namespace {
             return;
         }
 
-        std::cout << "[capture]  Cap #" << index
+        LOG_MAIN(" Cap #" << index
                   << " major=" << GuidToString(mediaType->majortype)
                   << " subtype=" << GuidToString(mediaType->subtype)
-                  << " format=" << GuidToString(mediaType->formattype) << std::endl;
+                  << " format=" << GuidToString(mediaType->formattype));
 
         if (mediaType->formattype == FORMAT_VideoInfo && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER)) {
             auto* vih = reinterpret_cast<VIDEOINFOHEADER*>(mediaType->pbFormat);
             if (vih) {
                 auto fps = vih->AvgTimePerFrame ? 10000000LL / vih->AvgTimePerFrame : 0;
-                std::cout << "[capture]    VideoInfo " << vih->bmiHeader.biWidth << "x"
-                          << vih->bmiHeader.biHeight << " @ " << fps << " fps" << std::endl;
+                LOG_MAIN("    VideoInfo " << vih->bmiHeader.biWidth << "x"
+                          << vih->bmiHeader.biHeight << " @ " << fps << " fps");
             }
         } else if (mediaType->formattype == FORMAT_VideoInfo2 && mediaType->cbFormat >= sizeof(VIDEOINFOHEADER2)) {
             auto* vih2 = reinterpret_cast<VIDEOINFOHEADER2*>(mediaType->pbFormat);
             if (vih2) {
                 auto fps = vih2->AvgTimePerFrame ? 10000000LL / vih2->AvgTimePerFrame : 0;
-                std::cout << "[capture]    VideoInfo2 " << vih2->bmiHeader.biWidth << "x"
-                          << vih2->bmiHeader.biHeight << " @ " << fps << " fps" << std::endl;
+                LOG_MAIN("    VideoInfo2 " << vih2->bmiHeader.biWidth << "x"
+                          << vih2->bmiHeader.biHeight << " @ " << fps << " fps");
             }
         }
     }
@@ -61,12 +62,12 @@ CaptureFormatSelection SelectCaptureFormat(IAMStreamConfig* streamConfig) {
     int capabilitySize = 0;
     HRESULT hr = streamConfig->GetNumberOfCapabilities(&capabilityCount, &capabilitySize);
     if (FAILED(hr) || capabilityCount <= 0 || capabilitySize <= 0) {
-        std::cout << "[capture] GetNumberOfCapabilities failed (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+        LOG_MAIN("GetNumberOfCapabilities failed (hr=" << std::hex << hr << std::dec << ")");
         return selection;
     }
 
-    std::cout << "[capture] IAMStreamConfig reports " << capabilityCount
-              << " capabilities (capSize=" << capabilitySize << ")." << std::endl;
+    LOG_MAIN("IAMStreamConfig reports " << capabilityCount
+              << " capabilities (capSize=" << capabilitySize << ").");
 
     std::vector<BYTE> capabilityBuffer(capabilitySize);
     AM_MEDIA_TYPE chosenFormat = {};
@@ -76,7 +77,7 @@ CaptureFormatSelection SelectCaptureFormat(IAMStreamConfig* streamConfig) {
         AM_MEDIA_TYPE* mediaType = nullptr;
         hr = streamConfig->GetStreamCaps(i, &mediaType, capabilityBuffer.data());
         if (FAILED(hr) || !mediaType) {
-            std::cout << "[capture]  Cap #" << i << " query failed (hr=" << std::hex << hr << std::dec << ")" << std::endl;
+            LOG_MAIN(" Cap #" << i << " query failed (hr=" << std::hex << hr << std::dec << ")");
             continue;
         }
 
@@ -114,11 +115,11 @@ CaptureFormatSelection SelectCaptureFormat(IAMStreamConfig* streamConfig) {
     if (hasChosenFormat) {
         hr = streamConfig->SetFormat(&chosenFormat);
         if (FAILED(hr)) {
-            std::cout << "[capture] Warning: IAMStreamConfig::SetFormat failed (hr=" << std::hex << hr
-                      << std::dec << "), continuing with device default format." << std::endl;
+            LOG_MAIN("Warning: IAMStreamConfig::SetFormat failed (hr=" << std::hex << hr
+                      << std::dec << "), continuing with device default format.");
         } else {
-            std::cout << "[capture] Capture format set successfully (subtype=" << GuidToString(chosenFormat.subtype)
-                      << ")." << std::endl;
+            LOG_MAIN("Capture format set successfully (subtype=" << GuidToString(chosenFormat.subtype)
+                      << ").");
         }
     }
 

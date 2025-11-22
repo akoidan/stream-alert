@@ -19,10 +19,7 @@ export class ImagelibService {
       return null;
     }
 
-    console.time("convertRgbToJpeg");
-    const result = this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
-    console.timeEnd("convertRgbToJpeg");
-    return result;
+    return this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
   }
 
   async getImageIfItsChanged(frameData: FrameData): Promise<Buffer | null> {
@@ -35,7 +32,6 @@ export class ImagelibService {
       return null;
     }
 
-    console.time("compareRgbImages");
     const diffPixels = this.native.compareRgbImages(
       this.oldFrame.buffer, 
       frameData.buffer, 
@@ -43,7 +39,6 @@ export class ImagelibService {
       frameData.height, 
       this.threshold
     );
-    console.timeEnd("compareRgbImages");
     
     if (diffPixels < this.diffThreshold) {
       return null;
@@ -51,9 +46,7 @@ export class ImagelibService {
     
     this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
 
-    console.time("convertRgbToJpeg");
     const jpegBuffer = this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);
-    console.timeEnd("convertRgbToJpeg");
 
     this.oldFrame = frameData;
     return jpegBuffer;

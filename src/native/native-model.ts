@@ -2,6 +2,7 @@ interface FrameData {
   buffer: Buffer;
   width: number;
   height: number;
+  dataSize: number;
 }
 
 interface INativeModule {

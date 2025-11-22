@@ -1,5 +1,6 @@
 #include "headers/capture_media.h"
 #include "headers/capture_state.h"
+#include "../logger.h"
 
 #include <iostream>
 
@@ -40,8 +41,8 @@ void ConfigureBitmapInfo(const BITMAPINFOHEADER& header, DWORD imageSize) {
 
     g_hasMediaInfo = true;
 
-    std::cout << "[capture] Configured bitmap info " << g_frameWidth << "x" << g_frameHeight
-              << " (" << g_bitmapInfoHeader.biBitCount << "bpp, size " << imageSize << ")" << std::endl;
+    LOG_MAIN("Configured bitmap info " << g_frameWidth << "x" << g_frameHeight
+              << " (" << g_bitmapInfoHeader.biBitCount << "bpp, size " << imageSize << ")");
 }
 
 void FreeMediaTypeContent(AM_MEDIA_TYPE& mt) {
@@ -80,10 +81,10 @@ void ConvertYuy2ToRgb24(const uint8_t* src, int width, int height, std::vector<u
     int srcStride = width * 2;
     int dstStride = width * 3;
     
-    // Convert to bottom-up BMP format (standard BMP format)
+    // Convert to top-down RGB format (standard for image processing)
     for (int y = 0; y < absHeight; ++y) {
         const uint8_t* srcRow = src + y * srcStride;
-        uint8_t* dstRow = dst.data() + (absHeight - 1 - y) * dstStride; // Flip vertically for bottom-up
+        uint8_t* dstRow = dst.data() + y * dstStride; // Top-down: no vertical flip
         for (int x = 0; x < width; x += 2) {
             int idx = x * 2;
             int y0 = srcRow[idx + 0];
@@ -102,12 +103,12 @@ void ConvertYuy2ToRgb24(const uint8_t* src, int width, int height, std::vector<u
             int b1 = (298 * c1 + 516 * d + 128) >> 8;
             uint8_t* pixel0 = dstRow + x * 3;
             uint8_t* pixel1 = dstRow + (x + 1) * 3;
-            pixel0[2] = ClampToByte(r0);
-            pixel0[1] = ClampToByte(g0);
-            pixel0[0] = ClampToByte(b0);
-            pixel1[2] = ClampToByte(r1);
-            pixel1[1] = ClampToByte(g1);
-            pixel1[0] = ClampToByte(b1);
+            pixel0[0] = ClampToByte(r0); // R
+            pixel0[1] = ClampToByte(g0); // G
+            pixel0[2] = ClampToByte(b0); // B
+            pixel1[0] = ClampToByte(r1); // R
+            pixel1[1] = ClampToByte(g1); // G
+            pixel1[2] = ClampToByte(b1); // B
         }
     }
 }
