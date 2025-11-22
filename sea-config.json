@@ -1,0 +1,4 @@
+{
+  "main": "sea-main.js",
+  "output": "sea-prep.blob"
+}
