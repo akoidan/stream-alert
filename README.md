@@ -4,6 +4,10 @@ Get a telegram notification when your webcamera or screen changes on Windows OS.
 
 ## Get started
 
+Install the app from releases and just run it.
+
+
+## Development
 
 ### Telegram
 - Install [telegram](https://telegram.org/) if you dont have it
