@@ -1,6 +1,12 @@
 import {join} from 'path';
 import process from 'node:process';
 
+// Enable file-based require for SEA
+if (require('node:sea').isSea()) {
+  const { createRequire } = require('node:module');
+  (global as any).require = createRequire(__filename);
+}
+
 process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config');
 
 import fs from 'fs';
