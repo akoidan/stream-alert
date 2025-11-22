@@ -7,7 +7,7 @@ import {AppService} from "@/app/app-service";
 
 @Module({
   imports: [StreamModule, TelegramModule, ImagelibModule],
-  providers: [Logger, AppService]
+  providers: [AppService, Logger]
 })
 export class AppModule implements OnModuleInit {
 

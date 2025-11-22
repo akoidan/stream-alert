@@ -3,7 +3,6 @@ import bindings from 'bindings';
 import {INativeModule, Native} from "@/native/native-model";
 import clc from "cli-color";
 
-
 @Module({
   providers: [
     Logger,
@@ -18,10 +17,11 @@ import clc from "cli-color";
   exports: [Native],
 })
 export class NativeModule {
+
   constructor(
-    private readonly logger: Logger,
     @Inject(Native)
-    private readonly native: INativeModule
+    private readonly native: INativeModule,
+    private readonly logger: Logger,
   ) {
   }
 

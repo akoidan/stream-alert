@@ -3,17 +3,21 @@ const { resolve } = require('path');
 const fs = require('fs');
 
 esbuild.build({
-  entryPoints: [resolve(__dirname, 'dist/main.js')],
+  entryPoints: [resolve(__dirname, 'src/main.ts')],
   bundle: true,
   outfile: resolve(__dirname, 'dist/sea-bundle.js'),
   platform: 'node',
   target: 'node24',
   format: 'cjs',
+  tsconfig: resolve(__dirname, 'tsconfig.json'),
+  resolveExtensions: ['.ts', '.js'],
   banner: {
     js: `
 // Fix import.meta for CJS
 globalThis.import = globalThis.import || {};
 globalThis.import.meta = globalThis.import.meta || { url: 'file://' + __filename };
+// Enable reflect-metadata for decorators
+require('reflect-metadata');
 `
   },
   external: [
@@ -25,6 +29,17 @@ globalThis.import.meta = globalThis.import.meta || { url: 'file://' + __filename
     // Externalize optional NestJS packages
     '@nestjs/websockets', '@nestjs/microservices', '@nestjs/websockets/socket-module',
     '@nestjs/microservices/microservices-module', 'class-validator', 'class-transformer'
+  ],
+  plugins: [
+    {
+      name: 'alias-plugin',
+      setup(build) {
+        build.onResolve({ filter: /^@\/(.*)$/ }, (args) => {
+          const path = args.path.slice(2); // Remove '@/' 
+          return { path: resolve(__dirname, 'src', path + '.ts') };
+        });
+      },
+    },
   ],
   logLevel: 'info'
 }).then(() => {
