@@ -1,7 +1,7 @@
 {
   "telegram": {
-    "token": "123",
-    "chatId": 2,
+    "token": "3",
+    "chatId": 3,
     "spamDelay": 10000,
     "message": "Changes detected"
   },

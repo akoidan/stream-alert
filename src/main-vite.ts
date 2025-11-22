@@ -7,6 +7,8 @@ process.env['NODE_CONFIG_TS_DIR'] = join(__dirname, 'config');
 const require = createRequire(import.meta.url);
 
 import * as readline from 'readline';
+import { CustomLogger } from '@/app/custom-logger';
+import { AppModule } from '@/app/app-module';
 
 // Load configuration directly
 const configPath = join(process.env.NODE_CONFIG_TS_DIR, 'default.json');
@@ -136,8 +138,6 @@ async function bootstrap() {
 
     // Start the NestJS application
     const { NestFactory } = require('@nestjs/core');
-    const { CustomLogger } = require('./app/custom-logger');
-    const { AppModule } = require('./app/app-module');
     
     const customLogger = new CustomLogger();
     const app = await NestFactory.createApplicationContext(AppModule, {

@@ -1,123 +1,83 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import fs from 'fs';
-import { execSync } from 'child_process';
-
-// Plugin to copy assets after build
-function copyAssetsPlugin() {
-  return {
-    name: 'copy-assets',
-    writeBundle() {
-      console.log('Copying assets after Vite build...');
-      
-      // Create proper directory structure for native bindings
-      if (!fs.existsSync('dist/build/Debug')) {
-        fs.mkdirSync('dist/build/Debug', { recursive: true });
-      }
-
-      // Copy native.node to dist/build/Debug (where bindings expects it)
-      if (fs.existsSync('build/Debug/native.node')) {
-        fs.copyFileSync('build/Debug/native.node', 'dist/build/Debug/native.node');
-        console.log('Copied native.node to dist/build/Debug');
-      } else {
-        console.error('native.node not found in build/Debug directory');
-        process.exit(1);
-      }
-
-      // Copy config files
-      if (!fs.existsSync('dist/config')) {
-        fs.mkdirSync('dist/config', { recursive: true });
-      }
-      fs.copyFileSync('src/config/default.json', 'dist/config/default.json');
-      console.log('Copied config files');
-
-      // Copy only production dependencies from node_modules
-      const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-      const dependencies = Object.keys(packageJson.dependencies || {});
-
-      if (!fs.existsSync('dist/node_modules')) {
-        fs.mkdirSync('dist/node_modules', { recursive: true });
-      }
-
-      dependencies.forEach(dep => {
-        const src = `node_modules/${dep}`;
-        const dest = `dist/node_modules/${dep}`;
-        
-        if (fs.existsSync(src)) {
-          execSync(`xcopy "${src}" "${dest}" /E /I /H /Y`, { stdio: 'inherit' });
-          console.log(`Copied ${dep}`);
-        } else {
-          console.warn(`${dep} not found in node_modules`);
-        }
-      });
-
-      console.log('Vite build completed with dependencies');
-    }
-  };
-}
+import { resolve, join } from 'path';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { copyFileSync, cpSync } from 'fs';
 
 export default defineConfig({
   build: {
     target: 'node18',
+    outDir: 'dist',
     lib: {
-      entry: resolve(__dirname, 'src/main-vite.ts'),
+      entry: resolve(__dirname, 'src/main.ts'),
       formats: ['cjs'],
-      fileName: 'bundle'
+      fileName: 'main'
     },
     rollupOptions: {
-      external: [
-        // Node built-ins
-        'node:process',
-        'node:fs',
-        'node:path',
-        'fs',
-        'path', 
-        'child_process',
-        'os',
-        'crypto',
-        'http',
-        'https',
-        'url',
-        'util',
-        'events',
-        'stream',
-        'buffer',
-        'module',
-        'readline',
-        // Native addons
-        'bindings',
-        'native.node',
-        // NestJS specific externals that may cause issues
-        '@nestjs/core',
-        '@nestjs/common',
-        '@nestjs/platform-express',
-        '@nestjs/config',
-        'reflect-metadata',
-        'rxjs',
-        'telegraf',
-        'cli-color',
-        'node-ts-config'
-      ],
-      output: {
-        dir: 'dist',
-        entryFileNames: 'bundle.js',
-        chunkFileNames: 'chunks/[name].js',
-        format: 'cjs',
-        interop: 'esModule'
-      }
+      plugins: [
+        {
+          name: 'copy-required-dependencies',
+          generateBundle(options, bundle) {
+            const copiedModules = new Set<string>();
+            const nodeModulesDir = resolve(__dirname, 'node_modules');
+            const distNodeModulesDir = resolve(__dirname, 'dist', 'node_modules');
+            
+            // Ensure dist/node_modules exists
+            if (!existsSync(distNodeModulesDir)) {
+              mkdirSync(distNodeModulesDir, { recursive: true });
+            }
+            
+            // Function to copy a module (but not its dependencies)
+            function copyModule(moduleName: string) {
+              if (copiedModules.has(moduleName)) return;
+              copiedModules.add(moduleName);
+              
+              try {
+                const moduleDir = join(nodeModulesDir, moduleName);
+                if (!existsSync(moduleDir)) return;
+                
+                const distModuleDir = join(distNodeModulesDir, moduleName);
+                
+                // Copy the entire module directory
+                cpSync(moduleDir, distModuleDir, { recursive: true });
+                console.log(`Copied module: ${moduleName}`);
+              } catch (error) {
+                console.warn(`Warning: Could not copy module ${moduleName}:`, error);
+              }
+            }
+            
+            // Get all imported modules from Rollup's module info
+            const moduleIds = this.getModuleIds();
+            moduleIds.forEach(moduleId => {
+              // Skip relative imports and built-in modules
+              if (typeof moduleId === 'string' && 
+                  !moduleId.startsWith('./') && 
+                  !moduleId.startsWith('../') && 
+                  !moduleId.startsWith('\0') &&
+                  !moduleId.startsWith('node:') &&
+                  !['fs', 'path', 'process', 'http', 'https', 'url', 'util', 'stream',
+                    'crypto', 'zlib', 'net', 'tls', 'dns', 'async_hooks', 'querystring',
+                    'events', 'buffer', 'child_process', 'cluster', 'dgram', 'inspector',
+                    'module', 'os', 'perf_hooks', 'readline', 'repl', 'string_decoder',
+                    'timers', 'trace_events', 'tty', 'v8', 'vm', 'wasi', 'worker_threads'].includes(moduleId)) {
+                
+                // Extract module name from path (remove subpaths)
+                const moduleName = moduleId.split('/')[0];
+                if (moduleName) {
+                  copyModule(moduleName);
+                }
+              }
+            });
+          }
+        }
+      ]
     },
     minify: false,
-    sourcemap: true
+    sourcemap: false,
+    ssr: true
   },
-  plugins: [
-    copyAssetsPlugin()
-  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
     }
-  },
-  define: {
-    'process.env.NODE_ENV': '"production"'
   }
 });

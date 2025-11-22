@@ -9,7 +9,9 @@
     "types": "node-ts-config",
     "cmake": "cmake-js build --debug",
     "vite": "vite build",
-    "build": "npm-run-all -s cmake vite native",
+    "build": "npm-run-all -s cmake build-sea native-sea",
+    "build-sea": "node scripts/build-sea.js",
+    "native-sea": "node --experimental-sea-config sea-config.json && node scripts/sea-postject.js",
     "native": "node --experimental-sea-config sea-config-vite.json && node scripts/sea-postject-vite.js"
   },
   "engines": {
@@ -26,6 +28,8 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@nestjs/testing": "^11.1.8",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@types/bindings": "^1.5.5",
     "@types/cli-color": "^2.0.6",
     "@types/node": "^24.10.1",
