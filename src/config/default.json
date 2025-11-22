@@ -6,7 +6,7 @@
     "message": "Changes detected"
   },
   "camera": {
-    "name": "@@CAMERA_NAME",
+    "name": "OBS Virtual Camera",
     "frameRate": 1
   },
   "diff": {
