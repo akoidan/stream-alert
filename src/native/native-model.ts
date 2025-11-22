@@ -27,14 +27,14 @@ interface INativeModule {
 
   // High-Performance RGB Functions
   /**
-   * Convert RGB image buffer to JPEG buffer
+   * Convert RGB image buffer to JPEG buffer asynchronously
    * @param rgbBuffer - Buffer containing RGB image data
    * @param width - Image width in pixels
    * @param height - Image height in pixels
-   * @returns Buffer containing JPEG data
+   * @returns Promise<Buffer> containing JPEG data
    * @throws Error if conversion fails
    */
-  convertRgbToJpeg(rgbBuffer: Buffer, width: number, height: number): Buffer;
+  convertRgbToJpeg(rgbBuffer: Buffer, width: number, height: number): Promise<Buffer>;
 
   /**
    * Compare two RGB images and count different pixels

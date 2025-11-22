@@ -25,7 +25,11 @@ const targetInterval = 1000 / fps;
 console.log(`Starting capture on "${deviceName}" at ${fps} FPS for ${durationSeconds}s.`);
 console.log('Waiting for frames...');
 
-const shutdown = () => {
+// Add setInterval to demonstrate non-blocking behavior
+let heartbeatCount = 0;
+
+
+const shutdown = async () => {
   capture.stop();
   const avgInterval = intervals.length
     ? intervals.reduce((sum, val) => sum + val, 0) / intervals.length
@@ -39,7 +43,11 @@ const shutdown = () => {
   if (savedFrame && savedFrame.buffer) {
     console.log(`Converting last RGB frame to JPEG...`);
     try {
-      const jpegBuffer = capture.convertRgbToJpeg(savedFrame.buffer, savedFrame.width, savedFrame.height);
+      const heartbeatInterval = setInterval(() => {
+        heartbeatCount++;
+        process.stdout.write(',')
+      }, 50);
+      const jpegBuffer = await capture.convertRgbToJpeg(savedFrame.buffer, savedFrame.width, savedFrame.height);
       fs.writeFileSync(outputPath, jpegBuffer);
       console.log(`✅ Last RGB frame converted and saved to ${outputPath}`);
       console.log(`📊 Original RGB: ${savedFrame.buffer.length} bytes, JPEG: ${jpegBuffer.length} bytes`);
@@ -50,6 +58,10 @@ const shutdown = () => {
   } else {
     console.log(`No frame data to convert.`);
   }
+  
+  // Clear the heartbeat interval
+  clearInterval(heartbeatInterval);
+  console.log(`\n🛑 Main thread heartbeat stopped after ${heartbeatCount} beats.`);
   
   process.exit(0);
 };

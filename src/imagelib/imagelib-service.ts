@@ -19,7 +19,7 @@ export class ImagelibService {
       return null;
     }
 
-    return this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
+    return await this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
   }
 
   async getImageIfItsChanged(frameData: FrameData): Promise<Buffer | null> {
@@ -46,7 +46,7 @@ export class ImagelibService {
     
     this.logger.log(`⚠️ CHANGE DETECTED: ${diffPixels} pixels`);
 
-    const jpegBuffer = this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);
+    const jpegBuffer = await this.native.convertRgbToJpeg(frameData.buffer, frameData.width, frameData.height);
 
     this.oldFrame = frameData;
     return jpegBuffer;

@@ -3,6 +3,7 @@
 #include "toojpeg.cpp"
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 // Global context for JPEG writing
 static std::vector<unsigned char>* g_jpegContext = nullptr;
@@ -69,6 +70,66 @@ size_t CompareRgbImagesDirect(const unsigned char* data1, const unsigned char* d
     return diffPixels;
 }
 
+// Async worker for JPEG conversion
+class JpegConversionWorker : public Napi::AsyncWorker {
+public:
+    JpegConversionWorker(Napi::Function& callback, 
+                         const std::vector<unsigned char>& bufferData,
+                         int width, int height,
+                         Napi::Promise::Deferred deferred)
+        : Napi::AsyncWorker(callback, "JpegConversionWorker"),
+          bufferData(bufferData),
+          width(width), height(height),
+          deferred(deferred) {}
+
+    ~JpegConversionWorker() {}
+
+    // This runs on the worker thread
+    void Execute() override {
+        try {
+            // Create SimpleImage from RGB data
+            SimpleImage img;
+            img.width = width;
+            img.height = height;
+            img.components = 3;
+            img.data = bufferData;
+            
+            // Encode JPEG (this runs in the background thread)
+            jpegResult = EncodeJPEG(img);
+            if (jpegResult.empty()) {
+                SetError("Failed to encode JPEG image");
+            }
+        } catch (const std::exception& e) {
+            SetError(e.what());
+        }
+    }
+
+    // This runs on the main thread after Execute() completes
+    void OnOK() override {
+        Napi::Env env = Env();
+        Napi::HandleScope scope(env);
+        
+        // Resolve the promise with the result
+        deferred.Resolve(Napi::Buffer<unsigned char>::Copy(env, jpegResult.data(), jpegResult.size()));
+    }
+
+    // This runs on the main thread if Execute() throws an error
+    void OnError(const Napi::Error& e) override {
+        Napi::Env env = Env();
+        Napi::HandleScope scope(env);
+        
+        // Reject the promise with the error
+        deferred.Reject(e.Value());
+    }
+
+private:
+    std::vector<unsigned char> bufferData;
+    std::vector<unsigned char> jpegResult;
+    int width;
+    int height;
+    Napi::Promise::Deferred deferred;
+};
+
 namespace ImageProc {
     Napi::Value ConvertRgbToJpeg(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
@@ -96,20 +157,24 @@ namespace ImageProc {
             throw Napi::Error::New(env, "Buffer too small for specified dimensions");
         }
         
-        // Create SimpleImage from RGB data
-        SimpleImage img;
-        img.width = width;
-        img.height = height;
-        img.components = 3;
-        img.data.assign(buffer.Data(), buffer.Data() + expectedSize);
+        // Create a promise
+        Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
         
-        // Encode JPEG
-        auto jpegData = EncodeJPEG(img);
-        if (jpegData.empty()) {
-            throw Napi::Error::New(env, "Failed to encode JPEG image");
-        }
+        // Create a dummy callback for AsyncWorker (we won't use it but AsyncWorker requires it)
+        Napi::Function dummyCallback = Napi::Function::New(env, [](const Napi::CallbackInfo&) {});
         
-        return Napi::Buffer<unsigned char>::Copy(env, jpegData.data(), jpegData.size());
+        // Create and queue the async worker
+        JpegConversionWorker* worker = new JpegConversionWorker(
+            dummyCallback, 
+            std::vector<unsigned char>(buffer.Data(), buffer.Data() + expectedSize),
+            width, 
+            height,
+            deferred
+        );
+        
+        worker->Queue();
+        
+        return deferred.Promise();
     }
     
     Napi::Value CompareRgbImages(const Napi::CallbackInfo& info) {
