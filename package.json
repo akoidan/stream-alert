@@ -4,6 +4,7 @@
   "description": "",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
+    "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-config-ts",
     "transpile": "nest build",
     "pkg:win32": "nexe dist/main.js --build --targets windows-x64-20.11.1 --resource node_modules/thread-stream/lib/worker.js --resource build/Debug/server.node",

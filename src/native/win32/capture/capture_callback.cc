@@ -148,16 +148,22 @@ void SampleGrabberCallback::DispatchFrame(const BITMAPINFOHEADER& infoHeader) {
         return;
     }
 
-    auto frameCopy = std::make_shared<std::vector<uint8_t>>(g_frameData);
+    // Create a copy of frame data for async callback
+    std::vector<uint8_t> frameCopy;
+    {
+        std::lock_guard<std::mutex> lock(g_frameMutex);
+        frameCopy = g_frameData;
+    }
+    
     auto frameWidth = g_frameWidth > 0 ? g_frameWidth : infoHeader.biWidth;
     auto frameHeight = g_frameHeight > 0 ? g_frameHeight : infoHeader.biHeight;
 
-    g_callbackFunction.NonBlockingCall([frameCopy, frameWidth, frameHeight](Napi::Env env, Napi::Function jsCallback) {
+    g_callbackFunction.NonBlockingCall([frameCopy = std::move(frameCopy), frameWidth, frameHeight](Napi::Env env, Napi::Function jsCallback) {
         Napi::Object frameData = Napi::Object::New(env);
         frameData.Set("width", Napi::Number::New(env, frameWidth));
         frameData.Set("height", Napi::Number::New(env, frameHeight));
 
-        Napi::Buffer<uint8_t> frameBuffer = Napi::Buffer<uint8_t>::Copy(env, frameCopy->data(), frameCopy->size());
+        Napi::Buffer<uint8_t> frameBuffer = Napi::Buffer<uint8_t>::Copy(env, frameCopy.data(), frameCopy.size());
         frameData.Set("buffer", frameBuffer);
 
         jsCallback.Call({frameData});

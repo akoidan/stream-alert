@@ -18,7 +18,9 @@ static bool g_comInitialized = false;
 namespace {
 
 [[noreturn]] void ThrowCaptureError(Napi::Env env, const char* message) {
+    // Clean up any partially allocated resources before throwing
     ReleaseCallbackFunction();
+    CleanupDirectShow();
     throw Napi::Error::New(env, message);
 }
 
@@ -103,9 +105,20 @@ void ConfigureSampleGrabberMediaType(Napi::Env env, const CaptureFormatSelection
     mt.cbFormat = sizeof(VIDEOINFOHEADER);
     mt.pbFormat = static_cast<unsigned char*>(CoTaskMemAlloc(sizeof(VIDEOINFOHEADER)));
     if (!mt.pbFormat) {
-        CleanupDirectShow();
         ThrowCaptureError(env, "Failed to allocate media type format");
     }
+
+    // Use RAII wrapper for automatic cleanup
+    struct MediaTypeGuard {
+        DexterLib::_AMMediaType* mt;
+        MediaTypeGuard(DexterLib::_AMMediaType* mediaType) : mt(mediaType) {}
+        ~MediaTypeGuard() { 
+            if (mt && mt->pbFormat) {
+                CoTaskMemFree(mt->pbFormat);
+                mt->pbFormat = nullptr;
+            }
+        }
+    } guard(&mt);
 
     ZeroMemory(mt.pbFormat, sizeof(VIDEOINFOHEADER));
     auto* vih = reinterpret_cast<VIDEOINFOHEADER*>(mt.pbFormat);
@@ -127,9 +140,7 @@ void ConfigureSampleGrabberMediaType(Napi::Env env, const CaptureFormatSelection
     }
 
     HRESULT hr = g_sampleGrabber->SetMediaType(&mt);
-    CoTaskMemFree(mt.pbFormat);
     if (FAILED(hr)) {
-        CleanupDirectShow();
         ThrowCaptureError(env, "Failed to set sample grabber media type");
     }
 
