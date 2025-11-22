@@ -45,8 +45,8 @@ HRESULT SampleGrabberCallback::ProcessBuffer(double sampleTime, BYTE* pBuffer, l
 
     auto sampleIndex = ++g_rawSamples;
     if (sampleIndex <= 5) {
-        LOG_MAIN("SampleGrabber sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
-                  << ", sampleTime=" << sampleTime);
+        // LOG_MAIN("SampleGrabber sampleIndex=" << sampleIndex << ", bufferLen=" << bufferLen
+                  // << ", sampleTime=" << sampleTime);
     }
 
     if (!HasValidMediaInfo()) {
@@ -137,8 +137,8 @@ void SampleGrabberCallback::DispatchFrame(const BITMAPINFOHEADER& infoHeader) {
         auto sampleIndex = g_rawSamples.load();
         if (sampleIndex % 30 == 0) {
             auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(interval - (now - g_lastCallbackTime)).count();
-            LOG_MAIN("Dropping frame due to FPS gate. sampleIndex=" << sampleIndex
-                      << ", waiting ~" << waitMs << "ms");
+            // LOG_MAIN("Dropping frame due to FPS gate. sampleIndex=" << sampleIndex
+                      // << ", waiting ~" << waitMs << "ms");
         }
         return;
     }

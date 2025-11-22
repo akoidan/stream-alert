@@ -1,6 +1,6 @@
-/// <reference path="../../config/Config.d.ts" />
+/// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
-import {config} from 'node-config-ts'
+import {config} from 'node-ts-config'
 import {StreamService} from "@/stream/stream-service";
 import {NativeModule} from "@/native/native-module";
 import {INativeModule, Native} from "@/native/native-model";

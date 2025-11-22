@@ -1,8 +1,8 @@
-/// <reference path="../../config/Config.d.ts" />
+/// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
 import {TelegramService} from "@/telegram/telegram-service";
 import {Telegraf} from "telegraf";
-import {config} from 'node-config-ts'
+import {config} from 'node-ts-config'
 
 @Module({
   exports: [TelegramService],

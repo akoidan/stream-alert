@@ -1,6 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
-declare module "node-config-ts" {
+declare module "node-ts-config" {
   interface IConfig {
     telegram: Telegram
     camera: string

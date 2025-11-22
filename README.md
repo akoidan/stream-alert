@@ -9,16 +9,16 @@ Get a telegram notification when your webcamera or screen changes on Windows OS.
 - Install [telegram](https://telegram.org/) if you dont have it
 - Create a new bot using @botfather chat in telegram
 - use `/newbot` command there and keep going until you finish creating your bot
-- copy token to file `config/default.json` at path to `telegram.token`
+- copy token to file `src/config/default.json` at path to `telegram.token`
 - Find your bot in the telegram and post a few messages there
-- Find another bot named `@userinfobot` and type start there, you will get Id, this is id of your chat, put it into `config/default.json` at path to `telegram.chatId` 
+- Find another bot named `@userinfobot` and type start there, you will get Id, this is id of your chat, put it into `src/config/default.json` at path to `telegram.chatId` 
 
 ### Input Camera 
 
 You need either real physical webcamera or some virtual webcamera
 
 #### Web camera
-For real physical web camera specify its name in `config/default.json` at path `camera`.
+For real physical web camera specify its name in `src/config/default.json` at path `camera`.
 
 #### OBS Virtual camera
 For screen capture you need OBS with streaming as a camera feature
@@ -27,7 +27,7 @@ For screen capture you need OBS with streaming as a camera feature
 - Launch OBS 
 - Capture a window or screen you want to monitor and click `Start Virtual Camera`
 - Try to fit only the area you need to monitor. Use `m2` on the window reactanble->`resize output (Source size)`. m2 on dark area -> `preview scaling`
-- Specify `OBS Virtual Camera` in `config/default.json` at path `camera`.
+- Specify `OBS Virtual Camera` in `src/config/default.json` at path `camera`.
 
 
 ### MS Visual C++
@@ -42,6 +42,7 @@ For screen capture you need OBS with streaming as a camera feature
 
 
 ### Set config
+Config file is located at src/config/default.json, or you can use src/config/user/osusername.json which is in gitignore
 
 - `diffThreshold` - amount of pixes required to change in the video in order to get a notification
 - `treshold` (0..1) - how significant change should be. Lower values require bigger changes per pixel

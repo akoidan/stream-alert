@@ -1,4 +1,4 @@
-/// <reference path="../../config/Config.d.ts" />
+/// <reference path="../config/Config.d.ts" />
 import {Logger, Module, OnModuleInit} from '@nestjs/common';
 import {TelegramModule} from "@/telegram/telegram-module";
 import {ImagelibModule} from "@/imagelib/imagelib-module";

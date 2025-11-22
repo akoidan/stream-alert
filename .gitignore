@@ -3,10 +3,11 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 .idea
-config/user
+src/config/user
 /build
 .vscode/*
 .vs
+dist
 out
 /scripts/image.bmp
 /scripts/commandcam.exe

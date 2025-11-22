@@ -8,5 +8,5 @@
   "camera": "OBS Virtual Camera",
   "frameRate": 1,
   "diffThreshold": 1000,
-  "threshold": 0.2
+  "threshold": 0.0
 }

@@ -1,6 +1,6 @@
-/// <reference path="../../config/Config.d.ts" />
+/// <reference path="../config/Config.d.ts" />
 import {Logger, Module, OnModuleInit} from '@nestjs/common';
-import {config} from 'node-config-ts'
+import {config} from 'node-ts-config'
 import {ImagelibService} from "@/imagelib/imagelib-service";
 import {INativeModule, Native} from "@/native/native-model";
 import {NativeModule} from "@/native/native-module";
