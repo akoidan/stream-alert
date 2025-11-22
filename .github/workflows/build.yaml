@@ -10,22 +10,26 @@ on:
         required: true
 
 jobs:
-  create_release:
-    runs-on: ubuntu-22.04
+  build_and_release:
+    runs-on: windows-2022
     permissions: write-all
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 24
+
       - name: Set Short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        run: echo "SHORT_SHA=$env:GITHUB_SHA.Substring(0,7)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Set Release Name from Input
         if: github.event_name == 'workflow_dispatch'
-        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" >> $GITHUB_ENV
+        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Set Release Name for Push Trigger
         if: github.event_name == 'push'
-        run: echo "RELEASE_NAME=${{ env.SHORT_SHA }}" >> $GITHUB_ENV
+        run: echo "RELEASE_NAME=$env:SHORT_SHA" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
@@ -36,29 +40,27 @@ jobs:
           release_name: ${{ env.RELEASE_NAME }}
           draft: false
           prerelease: false
-  win32:
-    runs-on: windows-2022
-    permissions: write-all
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 24
+
       - name: Cache node_modules cache
         id: cache-node
         uses: actions/cache@v4
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
+
       - name: Build native .node modules
         run: yarn cmake
+
       - name: Compile typescript nestjs project
         run: yarn nest
+
       - name: Bundle everything to a single file
         run: yarn esbuild
+
       - name: Create a windows executable
         run: yarn native
 
@@ -67,7 +69,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./dist/stream-alert.exe
           asset_name: app.exe
           asset_content_type: application/vnd.microsoft.portable-executable
