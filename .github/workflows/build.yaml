@@ -20,7 +20,7 @@ jobs:
           node-version: 24
 
       - name: Set Short SHA
-        run: echo "SHORT_SHA=$env:GITHUB_SHA.Substring(0,7)" | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: echo "SHORT_SHA=$($env:GITHUB_SHA.Substring(0,7))" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Set Release Name from Input
         if: github.event_name == 'workflow_dispatch'
@@ -29,17 +29,6 @@ jobs:
       - name: Set Release Name for Push Trigger
         if: github.event_name == 'push'
         run: echo "RELEASE_NAME=$env:SHORT_SHA" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ env.RELEASE_NAME }}
-          release_name: ${{ env.RELEASE_NAME }}
-          draft: false
-          prerelease: false
 
       - name: Cache node_modules cache
         id: cache-node
@@ -64,13 +53,12 @@ jobs:
       - name: Create a windows executable
         run: yarn native
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+      - name: Create GitHub Release and Upload Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/stream-alert.exe
-          asset_name: app.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
+        run: |
+          gh release create $env:RELEASE_NAME `
+            ./dist/stream-alert.exe#app.exe `
+            --title $env:RELEASE_NAME `
+            --notes "Release $env:RELEASE_NAME"
 
