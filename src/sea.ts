@@ -54,7 +54,7 @@ function getConfigQuestions() {
     {
       type: 'number',
       name: 'telegramSpamDelay',
-      message: '⏱️  Delay between alerts (milliseconds, min 10000 recommended)',
+      message: '⏱️  Delay between alerts in seconds. Short delay will result a lot of telegram notifications',
       initial: getInitial(globalSeaConf.data.telegram.spamDelay),
       validate: (value: any) => value >= 0 || 'Delay must be non-negative'
     },

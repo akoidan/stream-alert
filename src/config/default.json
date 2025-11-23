@@ -2,7 +2,8 @@
   "telegram": {
     "token": "@@TG_TOKEN",
     "chatId": "@@TG_CHAT_ID",
-    "spamDelay": 10000,
+    "spamDelay": 300,
+    "initialDelay": 10,
     "message": "Changes detected"
   },
   "camera": {

@@ -19,6 +19,7 @@ declare module "node-ts-config" {
     chatId: number
     spamDelay: number
     message: string
+    initialDelay: number
   }
   export const config: Config
   export type Config = IConfig

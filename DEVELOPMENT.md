@@ -56,7 +56,8 @@ Config file is located at `src/config/default.json`, or you can use `src/config/
 ### Configuration Options
 - `diff.pixels` - Minimum number of pixels that must change to trigger a notification
 - `diff.threshold` (0..1) - How significant the change should be. Lower values require bigger changes per pixel
-- `telegram.spamDelay` - Time in milliseconds between each Telegram message and delay after start
+- `telegram.spamDelay` - Time in seconds between each Telegram message
+- `telegram.initialDelay` - Time in seconds before first telegram notification can be sent. E.g. prevent from spamming tg, when camera still sees you.
 - `camera.frameRate` - How often (in seconds) to check for differences in video frames. 1 = 1 frame per second
 
 ## Running Locally
