@@ -8,64 +8,36 @@ add_definitions(-DNAPI_VERSION=4)
 
 include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
-
+include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
 
 set(MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/main.cc")
 file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
 
-if (UNIX AND APPLE)
-    message(STATUS "macOS build - not supported")
-elseif (WIN32)
-    message(STATUS "Windows build")
-elseif (UNIX AND NOT APPLE)
-    message(STATUS "Linux build")
-    add_definitions(-D_LINUX)
-endif()
-
 if(WIN32)
-    # Windows build
-
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
     include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/headers)
-
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/win32/*.cc")
-
     set(SOURCE_FILES ${CC_FILES} ${MAIN_SOURCE})
-    
-    add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
-    set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
-    target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} vfw32.lib strmiids.lib ole32.lib oleaut32.lib)
-    
+    set(LIBS ${CMAKE_JS_LIB} vfw32.lib strmiids.lib ole32.lib oleaut32.lib)
 elseif(UNIX AND NOT APPLE)
-    # Linux build
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
-    
-    # Find required packages
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
-
+    add_definitions(-D_LINUX)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
-
     set(SOURCE_FILES ${CC_FILES} ${MAIN_SOURCE})
-    
-    add_library(${PROJECT_NAME} ${SOURCE_FILES} ${CMAKE_JS_SRC})
-    set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
-    
-    # Link libraries
-    target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} PkgConfig::V4L2)
-    
-    # Set C++ standard
-    set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
-    
-    # Add compiler flags
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -pthread)
-    
+    set(LIBS ${CMAKE_JS_LIB} PkgConfig::V4L2)
 elseif(UNIX AND APPLE)
     message(FATAL_ERROR "macOS not supported")
 else()
     message(FATAL_ERROR "Unsupported OS")
 endif()
+
+
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+target_link_libraries(${PROJECT_NAME} ${LIBS})
+set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -pthread)
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
