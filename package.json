@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "schema": "zod2md --entry ./src/config/config-zod-schema.ts --title 'Config' --output CONFIG.md",
+    "schema": "zod2md --entry ./src/config/config-zod-schema.ts --title Config --output CONFIG.md",
     "debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
     "cmake": "cmake-js build",
