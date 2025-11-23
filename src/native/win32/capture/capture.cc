@@ -9,6 +9,8 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <locale>
+#include <codecvt>
 #include <Windows.h>
 
 #pragma comment(lib, "strmiids.lib")
@@ -25,7 +27,9 @@ namespace {
 }
 
 std::wstring ToWide(const std::string& value) {
-    return std::wstring(value.begin(), value.end());
+    if (value.empty()) return std::wstring();
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.from_bytes(value);
 }
 
 void InitializeGraphBuilder(Napi::Env env) {
@@ -336,7 +340,22 @@ void StartCapture(Napi::Env env, const std::string& deviceName, int fps) {
 
     InitializeGraphBuilder(env);
 
-    std::wstring deviceNameW = ToWide(deviceName);
+    // Check if deviceName is in "video://N" format and extract index
+    std::wstring deviceNameW;
+    if (deviceName.find("video://") == 0 && deviceName.length() > 8) {
+        try {
+            std::string indexStr = deviceName.substr(8); // Skip "video://" (8 chars)
+            int index = std::stoi(indexStr);
+            deviceNameW = std::to_wstring(index);
+            LOG_MAIN("Using camera at index " << index);
+        } catch (const std::exception& e) {
+            LOG_MAIN("Failed to parse video:// index: " << e.what());
+            deviceNameW = ToWide(deviceName);
+        }
+    } else {
+        deviceNameW = ToWide(deviceName);
+    }
+    
     AddVideoDeviceFilter(env, deviceNameW);
 
     ICaptureGraphBuilder2* captureBuilder = CreateCaptureGraphBuilder(env);
@@ -424,6 +443,24 @@ namespace Capture {
         
         return Napi::Buffer<uint8_t>::Copy(env, g_frameData.data(), g_frameData.size());
     }
+    
+    // List available cameras
+    Napi::Value ListAvailableCameras(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+        
+        auto cameras = GetAvailableCameras();
+        Napi::Array result = Napi::Array::New(env, cameras.size());
+        
+        uint32_t index = 0;
+        for (const auto& entry : cameras) {
+            Napi::Object camera = Napi::Object::New(env);
+            camera.Set("name", Napi::String::New(env, entry.first));
+            camera.Set("path", Napi::String::New(env, entry.second));
+            result.Set(index++, camera);
+        }
+        
+        return result;
+    }
 }
 
 // Initialize module
@@ -435,6 +472,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "start"), Napi::Function::New(env, Capture::Start));
     exports.Set(Napi::String::New(env, "stop"), Napi::Function::New(env, Capture::Stop));
     exports.Set(Napi::String::New(env, "getFrame"), Napi::Function::New(env, Capture::GetFrame));
+    exports.Set(Napi::String::New(env, "listAvailableCameras"), Napi::Function::New(env, Capture::ListAvailableCameras));
     
     return exports;
 }

@@ -67,4 +67,7 @@ namespace Capture {
     
     // Get latest frame
     Napi::Value GetFrame(const Napi::CallbackInfo& info);
+    
+    // List available cameras
+    Napi::Value ListAvailableCameras(const Napi::CallbackInfo& info);
 }
