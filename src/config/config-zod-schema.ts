@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import * as os from "node:os";
 
 // Zod Schemas based on Config.d.ts, default.json, and validation rules from sea.ts
 export const telegramSchema = z.object({
@@ -27,7 +28,7 @@ export const cameraSchema = z.object({
   name: z.string()
     .min(1, 'Camera name cannot be empty')
     .describe('📹 Camera name (e.g., "OBS Virtual Camera" or your webcam)')
-    .default('OBS Virtual Camera'),
+    .default(process.platform === 'linux' ? '/dev/video0' : 'OBS Virtual Camera'),
   frameRate: z.number()
     .positive('Frame rate must be positive')
     .describe('🎬 Frame rate in frames per second (recommended: 1-5)')

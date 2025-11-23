@@ -90,10 +90,17 @@ export class PromptConfigReader extends FileConfigReader {
           }
         } else if (fieldName === "camera.name") {
           const cameras = this.native.listAvailableCameras();
-          if (cameras.find(c => c.name === value)) {
+          if (cameras.find(c => c.path === value)) {
             return true;
           }
-          return `Invalid camera name, available devices ${JSON.stringify(cameras)}`
+          let s = '';
+          if (process.platform === 'linux') {
+            s = cameras.map(c => `${c.path} => ${c.name}`).join('\n');
+          } else {
+            s = cameras.map(c => c.name).join('\n');
+          }
+
+          return `Invalid camera name, available devices: \n ${s}`
         }
         return true;
       }
