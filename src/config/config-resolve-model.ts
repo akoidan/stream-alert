@@ -11,5 +11,3 @@ export interface IConfigResolver {
   getDiffConfig(): DiffConfig;
   getCameraConfig(): CameraConfig;
 }
-
-export const ConfigPath = 'ConfigPath';

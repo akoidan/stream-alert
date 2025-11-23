@@ -1,13 +1,22 @@
-import {Module} from '@nestjs/common';
+import {Logger, Module} from '@nestjs/common';
 import {CameraConfData, DiffConfData, IConfigResolver, TelegramConfigData} from "@/config/config-resolve-model";
 import {SeaConfigService} from "@/config/sea-config.service";
-import {ConfigLoadModule} from "@/config/config-load-module";
+import {isSea} from "node:sea";
 
 
 @Module({
-  imports: [ConfigLoadModule],
   exports: [TelegramConfigData, CameraConfData, DiffConfData],
   providers: [
+    Logger,
+    {
+      provide: SeaConfigService,
+      inject: [Logger],
+      useFactory: async (logger: Logger): Promise<SeaConfigService> => {
+        const data = new SeaConfigService(logger, isSea() ? __dirname : process.cwd());
+        await data.load()
+        return data;
+      },
+    },
     {
       provide: DiffConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
@@ -25,6 +34,6 @@ import {ConfigLoadModule} from "@/config/config-load-module";
     }
   ],
 })
-export class ConfigResolveModule  {
+export class ConfigResolveModule {
 
 }

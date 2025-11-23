@@ -1,5 +1,5 @@
-import {Inject, Injectable, Logger} from '@nestjs/common';
-import {ConfigPath, IConfigResolver} from "@/config/config-resolve-model";
+import {Injectable, Logger} from '@nestjs/common';
+import {IConfigResolver} from "@/config/config-resolve-model";
 import {promises as fs} from "fs";
 import path from "path";
 import {CameraConfig, Config, configSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
@@ -9,7 +9,6 @@ export class SeaConfigService implements IConfigResolver{
   private data: Config = null!;
   constructor(
     private readonly logger: Logger,
-    @Inject(ConfigPath)
     private readonly configsPath: string) {
   }
 
@@ -20,7 +19,7 @@ export class SeaConfigService implements IConfigResolver{
 
   public async load() {
     const data = await fs.readFile(this.confPath, 'utf8');
-    this.data = await configSchema.parseAsync(data);
+    this.data = await configSchema.parseAsync(JSON.parse(data));
   }
 
   public getTGConfig(): TelegramConfig {

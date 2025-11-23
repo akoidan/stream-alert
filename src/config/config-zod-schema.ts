@@ -7,7 +7,7 @@ export const telegramSchema = z.object({
     .describe('🔑 Bot token from @BotFather - required for Telegram bot authentication'),
   chatId: z.number()
     .int()
-    .min(10001, 'Chat ID must be greater than 10000')
+    .min(10001, 'Invalid Chat format')
     .describe('💬 Your Telegram chat ID - get it from @userinfobot'),
   spamDelay: z.number()
     .nonnegative('Delay must be non-negative')
