@@ -8,7 +8,8 @@
 #include <sstream>
 #include <string>
 
-namespace stream_alert::logger {
+namespace stream_alert {
+namespace logger {
 
 enum class Stream {
     StdOut,
@@ -75,7 +76,8 @@ inline void Write(Stream stream, const char* label, const std::string& message) 
         << std::endl;
 }
 
-} // namespace stream_alert::logger
+} // namespace logger
+} // namespace stream_alert
 
 #define STREAM_ALERT_LOG(stream, label, expr) \
     do { \
