@@ -10,7 +10,7 @@ esbuild.build({
   target: 'node24',
   format: 'cjs',
   external: [
-    'fs', 'path', 'process', 'node:process', 'node:fs', 'node:readline', 'node:module',
+    'fs', 'path', 'process', 'node:process', 'node:os', 'node:path',  'node:sea', 'node:fs', 'node:readline', 'node:module',
     'http', 'https', 'url', 'util', 'stream', 'crypto', 'zlib', 'net', 'tls', 'dns',
     'async_hooks', 'querystring', 'events', 'buffer', 'child_process', 'cluster',
     'dgram', 'inspector', 'module', 'os', 'perf_hooks', 'readline', 'repl',
