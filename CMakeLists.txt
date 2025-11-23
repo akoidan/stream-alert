@@ -21,14 +21,11 @@ endif()
 if(WIN32)
     # Windows build
 
-    include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/imageproc)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/vendor)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/headers)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
 
-    file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/win32/**.h")
-    file(GLOB_RECURSE CAPTURE_SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/**.cc")
-    file(GLOB_RECURSE IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
+    file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/win32/*.cc")
+    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
     set(MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/win32/main.cc")
     set(SOURCE_FILES ${CAPTURE_SOURCES} ${IMAGEPROC_SOURCES} ${MAIN_SOURCE} ${HEADERS})
     
@@ -45,8 +42,8 @@ elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
 
-    file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/**.cc")
-    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
+    file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
+    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
 
     set(LINUX_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/linux/main.cc")
     set(SOURCE_FILES ${HEADERS} ${SHARED_HEADERS} ${CC_FILES} ${CC_SHARED_FILES})
