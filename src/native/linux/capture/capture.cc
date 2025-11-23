@@ -18,6 +18,7 @@
 #include <array>
 #include <vector>
 #include <setjmp.h>
+#include <stdexcept>
 
 #include <jpeglib.h>
 
@@ -60,10 +61,37 @@ struct buffer {
     size_t length;
 };
 
+void LinuxCapture::SetEnv(Napi::Env env) {
+    env_ = env;
+}
+
+[[noreturn]] void LinuxCapture::ThrowError(const std::string& message) const {
+    if (env_ != nullptr) {
+        throw Napi::Error::New(Napi::Env(env_), message);
+    }
+    throw std::runtime_error(message);
+}
+
+[[noreturn]] void LinuxCapture::ThrowSystemError(const std::string& message, int err) const {
+    std::ostringstream oss;
+    oss << message;
+    if (err != 0) {
+        oss << ": (" << err << ") " << strerror(err);
+    }
+    ThrowError(oss.str());
+}
+
 LinuxCapture::LinuxCapture() = default;
 
 LinuxCapture::~LinuxCapture() {
-    StopCapture();
+    try {
+        StopCapture();
+    } catch (const Napi::Error& err) {
+        LOG_LNX_ERR("StopCapture raised error during destruction: " << err.Message());
+    } catch (const std::exception& err) {
+        LOG_LNX_ERR("StopCapture raised error during destruction: " << err.what());
+    }
+
     if (fd_ >= 0) {
         close(fd_);
         fd_ = -1;
@@ -108,7 +136,7 @@ static map<string, string> GetAvailableCameras() {
     return cameras;
 }
 
-bool LinuxCapture::OpenDevice(const string& deviceName) {
+void LinuxCapture::OpenDevice(const string& deviceName) {
     // First, get all available cameras
     auto cameras = GetAvailableCameras();
 
@@ -155,13 +183,11 @@ bool LinuxCapture::OpenDevice(const string& deviceName) {
     if (fd_ < 0) {
         int err = errno;
         LOG_LNX_ERR("Failed to open device " << devicePath << ": " << strerror(err));
-        return false;
+        ThrowSystemError("Failed to open device " + devicePath, err);
     }
-
-    return true;
 }
 
-bool LinuxCapture::StartCapture(int width, int height, int fps) {
+void LinuxCapture::StartCapture(int width, int height, int fps) {
     LOG_LNX("Starting capture with resolution: " << width << "x" << height << " at " << fps << "fps");
 
     if (isCapturing_) {
@@ -173,20 +199,13 @@ bool LinuxCapture::StartCapture(int width, int height, int fps) {
     height_ = height;
     fps_ = fps;
 
-    if (!InitDevice(width, height, fps)) {
-        LOG_LNX_ERR("Failed to initialize device");
-        return false;
-    }
+    InitDevice(width, height, fps);
 
     LOG_LNX("Device initialized, starting streaming...");
-    if (!StartStreaming()) {
-        LOG_LNX_ERR("Failed to start streaming");
-        return false;
-    }
+    StartStreaming();
 
     isCapturing_ = true;
     LOG_LNX("Capture started successfully");
-    return true;
 }
 
 void LinuxCapture::StopCapture() {
@@ -198,7 +217,7 @@ void LinuxCapture::StopCapture() {
     UninitDevice();
 }
 
-bool LinuxCapture::InitDevice(int width, int height, int fps) {
+void LinuxCapture::InitDevice(int width, int height, int fps) {
     LOG_LNX("Initializing device with resolution: " << width << "x" << height);
 
     // First, get the current format to see what's supported
@@ -206,8 +225,9 @@ bool LinuxCapture::InitDevice(int width, int height, int fps) {
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
-        LOG_LNX_ERR("Failed to get current format: " << strerror(errno));
-        return false;
+        int err = errno;
+        LOG_LNX_ERR("Failed to get current format: " << strerror(err));
+        ThrowSystemError("Failed to get current format", err);
     }
 
     LOG_LNX("Current format: "
@@ -225,15 +245,17 @@ bool LinuxCapture::InitDevice(int width, int height, int fps) {
 
     LOG_LNX("Requesting format: MJPEG " << width << "x" << height);
     if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-        LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(errno));
+        int err = errno;
+        LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(err));
 
         // Fall back to YUYV
         fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
         LOG_LNX("Falling back to YUYV format");
 
         if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-            LOG_LNX_ERR("Failed to set YUYV format: " << strerror(errno));
-            return false;
+            int fallbackErr = errno;
+            LOG_LNX_ERR("Failed to set YUYV format: " << strerror(fallbackErr));
+            ThrowSystemError("Failed to configure capture format", fallbackErr);
         }
     }
 
@@ -260,15 +282,10 @@ bool LinuxCapture::InitDevice(int width, int height, int fps) {
 
     // Request buffers
     LOG_LNX("Requesting video buffers...");
-    if (!RequestBuffers()) {
-        LOG_LNX_ERR("Failed to request buffers");
-        return false;
-    }
-
-    return true;
+    RequestBuffers();
 }
 
-bool LinuxCapture::UninitDevice() {
+void LinuxCapture::UninitDevice() {
     LOG_LNX("Uninitializing device, releasing " << buffers_.size() << " buffers");
 
     for (size_t i = 0; i < buffers_.size(); ++i) {
@@ -286,31 +303,9 @@ bool LinuxCapture::UninitDevice() {
     }
 
     buffers_.clear();
-
-    return true;
 }
 
-// Rest of the file remains the same...
-
-
-bool LinuxCapture::SetImageFormat(v4l2_format& fmt, int width, int height) {
-    fmt.fmt.pix.width = width;
-    fmt.fmt.pix.height = height;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG; // Prefer MJPEG, fallback to YUYV if needed
-    fmt.fmt.pix.field = V4L2_FIELD_ANY;
-
-    if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-        // Try YUYV if MJPEG fails
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-        if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool LinuxCapture::RequestBuffers() {
+void LinuxCapture::RequestBuffers() {
     // Request 4 buffers
     v4l2_requestbuffers req = {};
     req.count = 4;
@@ -320,12 +315,12 @@ bool LinuxCapture::RequestBuffers() {
     if (xioctl(fd_, VIDIOC_REQBUFS, &req) == -1) {
         int err = errno;
         LOG_LNX_ERR("VIDIOC_REQBUFS failed: (" << err << ") " << strerror(err));
-        return false;
+        ThrowSystemError("VIDIOC_REQBUFS failed", err);
     }
 
     if (req.count == 0) {
         LOG_LNX_ERR("VIDIOC_REQBUFS returned zero buffers");
-        return false;
+        ThrowError("VIDIOC_REQBUFS returned zero buffers");
     }
 
     LOG_LNX("Driver allocated " << req.count << " buffers");
@@ -340,7 +335,7 @@ bool LinuxCapture::RequestBuffers() {
         if (xioctl(fd_, VIDIOC_QUERYBUF, &buf) == -1) {
             int err = errno;
             LOG_LNX_ERR("VIDIOC_QUERYBUF failed for buffer " << i << ": (" << err << ") " << strerror(err));
-            return false;
+            ThrowSystemError("VIDIOC_QUERYBUF failed", err);
         }
 
         buffer* b = new buffer();
@@ -351,20 +346,18 @@ bool LinuxCapture::RequestBuffers() {
             int err = errno;
             LOG_LNX_ERR("Failed to mmap buffer " << i << ": (" << err << ") " << strerror(err));
             delete b;
-            return false;
+            ThrowSystemError("Failed to mmap buffer", err);
         }
 
         buffers_.push_back(b);
         LOG_LNX("Mapped buffer " << i << " of length " << b->length);
     }
-
-    return true;
 }
 
-bool LinuxCapture::StartStreaming() {
+void LinuxCapture::StartStreaming() {
     if (buffers_.empty()) {
         LOG_LNX_ERR("StartStreaming: No buffers available for streaming");
-        return false;
+        ThrowError("No buffers available for streaming");
     }
 
     LOG_LNX("Starting video stream with " << buffers_.size() << " buffers...");
@@ -377,10 +370,7 @@ bool LinuxCapture::StartStreaming() {
         buf.index = i;
 
         LOG_LNX("Queueing buffer " << i << "...");
-        if (!QueueBuffer(buf)) {
-            LOG_LNX_ERR("Failed to queue buffer " << i);
-            return false;
-        }
+        QueueBuffer(buf);
         LOG_LNX("Queued buffer " << i << " successfully");
     }
 
@@ -390,21 +380,19 @@ bool LinuxCapture::StartStreaming() {
     if (xioctl(fd_, VIDIOC_STREAMON, &type) == -1) {
         int err = errno;
         LOG_LNX_ERR("Failed to start streaming: (" << err << ") " << strerror(err));
-        return false;
+        ThrowSystemError("Failed to start streaming", err);
     }
 
     LOG_LNX("Video streaming started successfully");
-    return true;
 }
 
-bool LinuxCapture::StopStreaming() {
+void LinuxCapture::StopStreaming() {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (xioctl(fd_, VIDIOC_STREAMOFF, &type) == -1) {
         int err = errno;
         LOG_LNX_ERR("Failed to stop streaming: (" << err << ") " << strerror(err));
-        return false;
+        ThrowSystemError("Failed to stop streaming", err);
     }
-    return true;
 }
 
 int LinuxCapture::xioctl(int fd, unsigned long request, void* arg) const {
@@ -415,25 +403,23 @@ int LinuxCapture::xioctl(int fd, unsigned long request, void* arg) const {
     return r;
 }
 
-bool LinuxCapture::QueueBuffer(v4l2_buffer& buf) {
+void LinuxCapture::QueueBuffer(v4l2_buffer& buf) {
     int ret = xioctl(fd_, VIDIOC_QBUF, &buf);
     if (ret == -1) {
         int err = errno;
         LOG_LNX_ERR("VIDIOC_QBUF failed for buffer " << buf.index << ": (" << err << ") " << strerror(err));
-        return false;
+        ThrowSystemError("VIDIOC_QBUF failed", err);
     }
-    return true;
 }
 
-bool LinuxCapture::DequeueBuffer(v4l2_buffer& buf) {
+void LinuxCapture::DequeueBuffer(v4l2_buffer& buf) {
     int ret = xioctl(fd_, VIDIOC_DQBUF, &buf);
     if (ret == -1) {
         int err = errno;
         LOG_LNX_ERR("VIDIOC_DQBUF failed: (" << err << ") " << strerror(err));
-        return false;
+        ThrowSystemError("VIDIOC_DQBUF failed", err);
     }
 //     LOG_LNX("Dequeued buffer " << buf.index << " with " << buf.bytesused << " bytes used");
-    return true;
 }
 
 FrameData* LinuxCapture::GetFrame() {
@@ -468,9 +454,7 @@ FrameData* LinuxCapture::GetFrame() {
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
 
-    if (!DequeueBuffer(buf)) {
-        return nullptr;
-    }
+    DequeueBuffer(buf);
 
     // Process the frame
     FrameData* frame = new FrameData();
@@ -564,8 +548,10 @@ FrameData* LinuxCapture::GetFrame() {
 //             << "x" << frame->height << ")");
 
     // Requeue the buffer
-    if (!QueueBuffer(buf)) {
-        LOG_LNX_ERR("Failed to requeue buffer " << buf.index);
+    try {
+        QueueBuffer(buf);
+    } catch (const std::exception& err) {
+        LOG_LNX_ERR("Failed to requeue buffer " << buf.index << ": " << err.what());
     }
 
     return frame;
@@ -601,21 +587,26 @@ namespace Capture {
 
         // Create and start capture
         g_capture = std::make_unique<LinuxCapture>();
-        LOG_LNX("Attempting to open device: " << deviceName);
-        
-        if (!g_capture->OpenDevice(deviceName)) {
-            std::string errorMsg = "Failed to open device: " + deviceName + " (tried " + g_capture->GetDeviceName() + ")";
-            LOG_LNX_ERR(errorMsg);
-            Napi::Error::New(env, errorMsg).ThrowAsJavaScriptException();
-            return env.Null();
-        }
-        
-        LOG_LNX("Successfully opened device: " << g_capture->GetDeviceName());
+        g_capture->SetEnv(env);
 
-        // Start capture with default resolution
-        if (!g_capture->StartCapture(640, 480, frameRate)) {
-            Napi::Error::New(env, "Failed to start capture")
-                .ThrowAsJavaScriptException();
+        try {
+            LOG_LNX("Attempting to open device: " << deviceName);
+            g_capture->OpenDevice(deviceName);
+            LOG_LNX("Successfully opened device: " << g_capture->GetDeviceName());
+
+            // Start capture with default resolution
+            g_capture->StartCapture(640, 480, frameRate);
+        } catch (const Napi::Error& error) {
+            g_isCapturing = false;
+            g_capture.reset();
+            g_callbackFunction.Release();
+            error.ThrowAsJavaScriptException();
+            return env.Null();
+        } catch (const std::exception& error) {
+            g_isCapturing = false;
+            g_capture.reset();
+            g_callbackFunction.Release();
+            Napi::Error::New(env, error.what()).ThrowAsJavaScriptException();
             return env.Null();
         }
 
@@ -623,7 +614,15 @@ namespace Capture {
         g_isCapturing = true;
         g_captureThread = std::thread([]() {
             while (Capture::g_isCapturing) {
-                auto frame = Capture::g_capture->GetFrame();
+                FrameData* frame = nullptr;
+                try {
+                    frame = Capture::g_capture->GetFrame();
+                } catch (const Napi::Error& error) {
+                    LOG_LNX_ERR("GetFrame error: " << error.Message());
+                } catch (const std::exception& error) {
+                    LOG_LNX_ERR("GetFrame error: " << error.what());
+                }
+
                 if (frame) {
                     auto callback = [](Napi::Env env, Napi::Function jsCallback, FrameData* frameData) {
                         if (frameData) {
@@ -674,9 +673,21 @@ namespace Capture {
             Capture::g_captureThread.join();
         }
         
-        if (Capture::g_capture) {
-            Capture::g_capture->StopCapture();
+        try {
+            if (Capture::g_capture) {
+                Capture::g_capture->StopCapture();
+                Capture::g_capture.reset();
+            }
+        } catch (const Napi::Error& error) {
             Capture::g_capture.reset();
+            Capture::g_callbackFunction.Release();
+            error.ThrowAsJavaScriptException();
+            return env.Null();
+        } catch (const std::exception& error) {
+            Capture::g_capture.reset();
+            Capture::g_callbackFunction.Release();
+            Napi::Error::New(env, error.what()).ThrowAsJavaScriptException();
+            return env.Null();
         }
         
         Capture::g_callbackFunction.Release();

@@ -18,26 +18,27 @@ public:
     LinuxCapture();
     ~LinuxCapture();
 
-    bool OpenDevice(const std::string& deviceName);
-    bool StartCapture(int width, int height, int fps);
+    void OpenDevice(const std::string& deviceName);
+    void StartCapture(int width, int height, int fps);
     void StopCapture();
     FrameData* GetFrame();
     bool IsCapturing() const { return isCapturing_; }
     const std::string& GetDeviceName() const { return deviceName_; }
+    void SetEnv(Napi::Env env);
     
 private:
-    bool InitDevice(int width, int height, int fps);
-    bool UninitDevice();
-    bool StartStreaming();
-    bool StopStreaming();
-    bool ProcessFrame(const void* p, int size);
+    void InitDevice(int width, int height, int fps);
+    void UninitDevice();
+    void StartStreaming();
+    void StopStreaming();
     
     // V4L2 helper functions
     int xioctl(int fd, unsigned long request, void* arg) const;
-    bool SetImageFormat(v4l2_format& fmt, int width, int height);
-    bool RequestBuffers();
-    bool QueueBuffer(v4l2_buffer& buf);
-    bool DequeueBuffer(v4l2_buffer& buf);
+    void RequestBuffers();
+    void QueueBuffer(v4l2_buffer& buf);
+    void DequeueBuffer(v4l2_buffer& buf);
+    [[noreturn]] void ThrowSystemError(const std::string& message, int err) const;
+    [[noreturn]] void ThrowError(const std::string& message) const;
     
     int fd_ = -1;
     std::vector<buffer*> buffers_;
@@ -49,6 +50,7 @@ private:
     int fps_ = 0;
     uint32_t pixelFormat_ = 0;
     std::string deviceName_;
+    napi_env env_ = nullptr;
 };
 
 // N-API functions
