@@ -11,3 +11,7 @@ export interface IConfigResolver {
   getDiffConfig(): DiffConfig;
   getCameraConfig(): CameraConfig;
 }
+
+export const TelegrafGet = 'TelegrafGet';
+export const Platform = 'Platform';
+export const ConfigPath = 'ConfigPath';

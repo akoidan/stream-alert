@@ -3,8 +3,7 @@ import {aconfigSchema} from "@/config/config-zod-schema";
 import {FileConfigReader} from "@/config/file-config-reader.service";
 import prompts from 'prompts';
 import {promises as fs} from "fs";
-import {INativeModule} from "@/native/native-model";
-import {Telegraf} from "telegraf";
+import {FieldsValidator} from "@/config/fields-validator";
 
 @Injectable()
 export class PromptConfigReader extends FileConfigReader {
@@ -12,7 +11,7 @@ export class PromptConfigReader extends FileConfigReader {
   constructor(
     logger: Logger,
     configsPath: string,
-    private readonly native: INativeModule,
+    private readonly validator: FieldsValidator,
   ) {
     super(logger, configsPath)
   }
@@ -76,31 +75,18 @@ export class PromptConfigReader extends FileConfigReader {
       message: description,
       initial: defaultValue
     };
-    
+
     // Add validation using Zod
     question.validate = async (value: any) => {
 
       const result = zodField.safeParse(value);
       if (result.success) {
-        if (fieldName === 'telegram.token') {
-          const bot = new Telegraf(value)
-          const tokenValid = await bot.telegram.getMe().then(() => true).catch(() => false);
-          if (!tokenValid) {
-            return 'Invalid token';
-          }
+        if (fieldName === 'telegram.chatId') {
+          return this.validator.validateTgChat(value);
+        } else if (fieldName === 'telegram.token') {
+          return this.validator.validateTgToken(value);
         } else if (fieldName === "camera.name") {
-          const cameras = this.native.listAvailableCameras();
-          if (cameras.find(c => c.path === value)) {
-            return true;
-          }
-          let s = '';
-          if (process.platform === 'linux') {
-            s = cameras.map(c => `${c.path} => ${c.name}`).join('\n');
-          } else {
-            s = cameras.map(c => c.name).join('\n');
-          }
-
-          return `Invalid camera name, available devices: \n ${s}`
+          return this.validator.validateCamera(value);
         }
         return true;
       }
