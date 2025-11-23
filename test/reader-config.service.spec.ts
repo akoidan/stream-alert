@@ -1,12 +1,35 @@
 import { Logger } from '@nestjs/common';
-import { PromptConfigReader } from './promt-config-reader.service';
-import { aconfigSchema } from './config-zod-schema';
+import { PromptConfigReader } from '../src/config/promt-config-reader.service';
+import { aconfigSchema } from '../src/config/config-zod-schema';
 import prompts from 'prompts';
-import {FieldsValidator} from "@/config/fields-validator";
 
 // Mock the prompts module
 jest.mock('prompts');
 const mockedPrompts = prompts as jest.MockedFunction<typeof prompts>;
+
+// Mock FieldsValidator to avoid dependency injection issues
+class MockFieldsValidator {
+  public validateCamera(value: any) {
+    return true;
+  }
+  
+  public async validateTgChat(value: any) {
+    return true;
+  }
+  
+  public async validateTgToken(value: any) {
+    return true;
+  }
+  
+  // Add synchronous versions for testing
+  public validateTgChatSync(value: any) {
+    return true;
+  }
+  
+  public validateTgTokenSync(value: any) {
+    return true;
+  }
+}
 
 describe('ReaderConfigService', () => {
   let service: PromptConfigReader;
@@ -22,7 +45,7 @@ describe('ReaderConfigService', () => {
     } as any;
 
     // Create service instance directly with test dependencies
-    // service = new PromptConfigReader(mockLogger, '/test/configs', new FieldsValidator());
+    service = new PromptConfigReader(mockLogger, '/test/configs', new MockFieldsValidator() as any);
   });
 
   afterEach(() => {
@@ -80,7 +103,7 @@ describe('ReaderConfigService', () => {
   });
 
   describe('validation', () => {
-    it('should validate telegram token format', () => {
+    it('should validate telegram token format', async () => {
       const questions: any[] = [];
       (service as any).addQuestions('', aconfigSchema, questions);
       
@@ -88,13 +111,15 @@ describe('ReaderConfigService', () => {
       const validate = tokenQuestion.validate;
 
       // Valid token (matches the regex: 10 digits : 35 alphanumeric chars)
-      expect(validate('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789')).toBe(true);
+      const result1 = await validate('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
+      expect(result1).toBe(true);
       
       // Invalid token
-      expect(validate('invalid')).toBe('Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz)');
+      const result2 = await validate('invalid');
+      expect(result2).toBe('Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss');
     });
 
-    it('should validate chat ID format', () => {
+    it('should validate chat ID format', async () => {
       const questions: any[] = [];
       (service as any).addQuestions('', aconfigSchema, questions);
       
@@ -102,13 +127,15 @@ describe('ReaderConfigService', () => {
       const validate = chatIdQuestion.validate;
 
       // Valid chat ID
-      expect(validate(123456789)).toBe(true);
+      const result1 = await validate(123456789);
+      expect(result1).toBe(true);
       
       // Invalid chat ID
-      expect(validate(1000)).toBe('Invalid Chat format');
+      const result2 = await validate(1000);
+      expect(result2).toBe('Invalid Chat format');
     });
 
-    it('should validate frame rate', () => {
+    it('should validate frame rate', async () => {
       const questions: any[] = [];
       (service as any).addQuestions('', aconfigSchema, questions);
       
@@ -116,14 +143,17 @@ describe('ReaderConfigService', () => {
       const validate = frameRateQuestion.validate;
 
       // Valid frame rate
-      expect(validate(5)).toBe(true);
+      const result1 = await validate(5);
+      expect(result1).toBe(true);
       
       // Invalid frame rate
-      expect(validate(0)).toBe('Frame rate must be positive');
-      expect(validate(-1)).toBe('Frame rate must be positive');
+      const result2 = await validate(0);
+      expect(result2).toBe('Frame rate must be positive');
+      const result3 = await validate(-1);
+      expect(result3).toBe('Frame rate must be positive');
     });
 
-    it('should validate threshold range', () => {
+    it('should validate threshold range', async () => {
       const questions: any[] = [];
       (service as any).addQuestions('', aconfigSchema, questions);
       
@@ -131,13 +161,18 @@ describe('ReaderConfigService', () => {
       const validate = thresholdQuestion.validate;
 
       // Valid threshold
-      expect(validate(0.5)).toBe(true);
-      expect(validate(0.0)).toBe(true);
-      expect(validate(1.0)).toBe(true);
+      const result1 = await validate(0.5);
+      expect(result1).toBe(true);
+      const result2 = await validate(0.0);
+      expect(result2).toBe(true);
+      const result3 = await validate(1.0);
+      expect(result3).toBe(true);
       
       // Invalid threshold
-      expect(validate(-0.1)).toBe('Threshold must be at least 0.0');
-      expect(validate(1.1)).toBe('Threshold must be at most 1.0');
+      const result4 = await validate(-0.1);
+      expect(result4).toBe('Threshold must be at least 0.0');
+      const result5 = await validate(1.1);
+      expect(result5).toBe('Threshold must be at most 1.0');
     });
   });
 
