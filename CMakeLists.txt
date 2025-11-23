@@ -31,12 +31,10 @@ endif()
 set(SOURCE_FILES ${CC_FILES} ${CC_SHARED_FILES} ${MAIN_SOURCE})
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 target_link_libraries(${PROJECT_NAME} ${LIBS})
+
 if(UNIX AND NOT APPLE)
     set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
     target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -pthread)
 endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
-if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
-  # Generate node.lib
-  execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
-endif()
