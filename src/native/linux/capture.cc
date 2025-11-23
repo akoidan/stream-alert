@@ -22,7 +22,7 @@
 
 #include <jpeglib.h>
 
-#include "../../shared/logger/logger.h"
+#include "logger.h"
 
 namespace {
     inline uint8_t ClampToByte(int value) {

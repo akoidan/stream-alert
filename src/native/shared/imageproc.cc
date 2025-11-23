@@ -1,7 +1,6 @@
 #include "imageproc.h"
 
-#include "../vendor/toojpeg.h"
-#include "../vendor/toojpeg.cpp"
+#include "toojpeg.h"
 
 #include <algorithm>
 #include <cmath>

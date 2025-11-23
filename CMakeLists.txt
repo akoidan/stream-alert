@@ -8,9 +8,6 @@ add_definitions(-DNAPI_VERSION=4)
 
 include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
-include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/imageproc)
-include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/vendor)
-include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/headers)
 
 if (UNIX AND APPLE)
     message(STATUS "macOS build - not supported")
@@ -23,6 +20,12 @@ endif()
 
 if(WIN32)
     # Windows build
+
+    include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/imageproc)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/vendor)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/headers)
+
     file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/win32/**.h")
     file(GLOB_RECURSE CAPTURE_SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/**.cc")
     file(GLOB_RECURSE IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
@@ -35,16 +38,13 @@ if(WIN32)
     
 elseif(UNIX AND NOT APPLE)
     # Linux build
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/common)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/capture)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
     
     # Find required packages
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
-    
-    # Source files
-    file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/linux/**.h")
-    file(GLOB_RECURSE SHARED_HEADERS "${CMAKE_SOURCE_DIR}/src/native/shared/**.h")
+
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/**.cc")
     file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
 
