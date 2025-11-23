@@ -1,6 +1,6 @@
 #include "capture_media.h"
 #include "capture_state.h"
-#include "../logger.h"
+#include "logger.h"
 
 #include <iostream>
 

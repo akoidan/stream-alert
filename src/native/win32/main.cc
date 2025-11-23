@@ -1,6 +1,6 @@
 #include <napi.h>
-#include "../../shared/capture/headers/capture.h"
-#include "./imageproc/headers/imageproc.h"
+#include "capture.h"
+#include "imageproc.h"
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     // Initialize capture module
