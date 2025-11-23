@@ -22,6 +22,10 @@ export class TelegramService {
 
   async setup(commandListener: TgCommandsExecutor): Promise<void> {
     this.logger.log("Starting telegram service");
+    
+    // Validate token first
+    await this.validateToken();
+    
     await this.bot.telegram.setMyCommands([
       {command: TelegramCommands.image, description: "Get the last image"},
       {
@@ -42,6 +46,15 @@ export class TelegramService {
     this.bot.command(TelegramCommands.increase_threshold, () => commandListener.onIncreaseThreshold());
     this.bot.command(TelegramCommands.decrease_threshold, () => commandListener.onDecreaseThreshold());
     await this.bot.launch();
+  }
+
+  private async validateToken(): Promise<void> {
+    try {
+      const botInfo = await this.bot.telegram.getMe();
+      this.logger.log(`Telegram bot validated: @${botInfo.username} (${botInfo.first_name})`);
+    } catch (error) {
+      throw new Error('Telegram token validation failed. Please check your bot token.');
+    }
   }
 
   async sendText(text: string): Promise<void> {
