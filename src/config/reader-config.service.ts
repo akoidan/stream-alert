@@ -139,24 +139,8 @@ export class ReaderConfigService extends SimpleConfigService {
 }
 
   private updateDataFromResponsesRecursive(responses: any) {
-    // Initialize data with defaults from Zod schema - provide valid defaults that pass validation
-    this.data = configSchema.parse({
-      telegram: {
-        token: '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789', // Valid token format (10 digits : 35 chars)
-        chatId: 123456789, // Valid chat ID (> 10000)
-        spamDelay: 300,
-        message: 'Changes detected',
-        initialDelay: 10
-      },
-      camera: {
-        name: 'OBS Virtual Camera',
-        frameRate: 1
-      },
-      diff: {
-        pixels: 1000,
-        threshold: 0.1
-      }
-    });
+    // Start with empty object
+    this.data = {} as any;
     
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {

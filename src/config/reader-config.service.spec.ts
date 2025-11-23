@@ -225,7 +225,7 @@ describe('ReaderConfigService', () => {
       const updateData = (service as any).updateDataFromResponsesRecursive.bind(service);
       
       const mockResponses = {
-        'telegram.token': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz',
+        'telegram.token': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789',
         'telegram.chatId': 123456789,
         'camera.name': 'Test Camera',
         'diff.pixels': 2000,
@@ -233,14 +233,18 @@ describe('ReaderConfigService', () => {
 
       updateData(mockResponses);
 
-      // Check that data was initialized with defaults and updated with responses
-      expect(service.getTGConfig().token).toBe('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+      // Check that data was initialized with responses only
+      expect(service.getTGConfig().token).toBe('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
       expect(service.getTGConfig().chatId).toBe(123456789);
-      expect(service.getTGConfig().spamDelay).toBe(300); // Default value
       expect(service.getCameraConfig().name).toBe('Test Camera');
-      expect(service.getCameraConfig().frameRate).toBe(1); // Default value
       expect(service.getDiffConfig().pixels).toBe(2000);
-      expect(service.getDiffConfig().threshold).toBe(0.1); // Default value
+      
+      // Other fields should be undefined since they weren't provided
+      expect(service.getTGConfig().spamDelay).toBeUndefined();
+      expect(service.getTGConfig().message).toBeUndefined();
+      expect(service.getTGConfig().initialDelay).toBeUndefined();
+      expect(service.getCameraConfig().frameRate).toBeUndefined();
+      expect(service.getDiffConfig().threshold).toBeUndefined();
     });
   });
 });
