@@ -40,7 +40,7 @@ export class PromptConfigReader extends FileConfigReader {
     // Update the data with responses using recursive mapping
     this.updateDataFromResponsesRecursive(responses);
     this.logger.log(`Saving data to file ${this.confPath}`)
-    await fs.writeFile(this.confPath, JSON.stringify(this.data));
+    await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
   }
 
   private addQuestions(prefix: string, schema: any, questions: any[], path: string[] = []): void {
