@@ -5,6 +5,11 @@ interface FrameData {
   dataSize: number;
 }
 
+interface NativeCameraInfo {
+  name: string;
+  path: string;
+}
+
 interface INativeModule {
   /**
    * Starts video capture with callback
@@ -24,6 +29,12 @@ interface INativeModule {
    * @returns FrameData object with RGB buffer and dimensions, or null if no frame available
    */
   getFrame(): FrameData | null;
+
+  /**
+   * Lists available camera devices on the system
+   * @returns Array of camera descriptors including display name and device path
+   */
+  listAvailableCameras(): NativeCameraInfo[];
 
   // High-Performance RGB Functions
   /**
@@ -57,5 +68,6 @@ export const Native = 'Native';
 export type {
   INativeModule,
   FrameData,
+  NativeCameraInfo,
 };
 

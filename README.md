@@ -53,7 +53,6 @@ When you first run the app, you'll be asked to configure:
 
 ## Troubleshooting
 
-- **Camera not found**: Check camera name in device manager or use Google Meet settings to see available cameras
 - **No Telegram notifications**: Verify bot token and chat ID are correct
 - **Too many notifications**: Increase alert delay or sensitivity
 - **Too few notifications**: Decrease sensitivity or alert delay

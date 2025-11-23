@@ -1,9 +1,10 @@
 import {z} from 'zod';
+import * as os from "node:os";
 
 // Zod Schemas based on Config.d.ts, default.json, and validation rules from sea.ts
 export const telegramSchema = z.object({
   token: z.string()
-    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz)')
+    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
     .describe('🔑 Bot token from @BotFather - required for Telegram bot authentication'),
   chatId: z.number()
     .int()
@@ -27,7 +28,7 @@ export const cameraSchema = z.object({
   name: z.string()
     .min(1, 'Camera name cannot be empty')
     .describe('📹 Camera name (e.g., "OBS Virtual Camera" or your webcam)')
-    .default('OBS Virtual Camera'),
+    .default(process.platform === 'linux' ? '/dev/video0' : 'OBS Virtual Camera'),
   frameRate: z.number()
     .positive('Frame rate must be positive')
     .describe('🎬 Frame rate in frames per second (recommended: 1-5)')

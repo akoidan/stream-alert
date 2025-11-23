@@ -7,6 +7,7 @@
 #include <linux/videodev2.h>
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
 #include <thread>
 #include <chrono>
 #include <iostream>
@@ -19,6 +20,7 @@
 #include <vector>
 #include <setjmp.h>
 #include <stdexcept>
+#include <cctype>
 
 #include <jpeglib.h>
 
@@ -99,40 +101,128 @@ LinuxCapture::~LinuxCapture() {
 }
 
 // Helper function to get a map of available camera names to device paths
+static string Trim(const string& value) {
+    const auto begin = find_if_not(value.begin(), value.end(), [](unsigned char ch) { return std::isspace(ch); });
+    if (begin == value.end()) {
+        return "";
+    }
+    const auto end = find_if_not(value.rbegin(), value.rend(), [](unsigned char ch) { return std::isspace(ch); }).base();
+    return string(begin, end);
+}
+
+static string MakeUniqueCameraName(map<string, string>& cameras, const string& baseName) {
+    string sanitized = Trim(baseName);
+    if (sanitized.empty()) {
+        sanitized = "Unknown Video Device";
+    }
+
+    if (cameras.find(sanitized) == cameras.end()) {
+        return sanitized;
+    }
+
+    int suffix = 2;
+    string candidate;
+    do {
+        candidate = sanitized + " (" + to_string(suffix++) + ")";
+    } while (cameras.find(candidate) != cameras.end());
+
+    return candidate;
+}
+
 static map<string, string> GetAvailableCameras() {
     map<string, string> cameras;
+
+    auto addCamera = [&](const string& name, const string& path) {
+        if (path.empty()) {
+            return;
+        }
+        string devicePath = Trim(path);
+        if (devicePath.empty()) {
+            return;
+        }
+        string uniqueName = MakeUniqueCameraName(cameras, name.empty() ? devicePath : name);
+        cameras[uniqueName] = devicePath;
+    };
 
     // Execute v4l2-ctl command to list devices
     FILE* pipe = popen("v4l2-ctl --list-devices 2>&1", "r");
     if (!pipe) {
         LOG_LNX_ERR("Failed to execute v4l2-ctl");
-        return cameras;
-    }
+    } else {
+        char buffer[256];
+        string currentName;
 
-    char buffer[256];
-    string currentName;
+        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+            string line(buffer);
+            if (!line.empty() && line.back() == '\n') {
+                line.pop_back();
+            }
 
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        string line(buffer);
-        // Remove trailing newline
-        if (!line.empty() && line[line.length() - 1] == '\n') {
-            line.erase(line.length() - 1);
-        }
+            string trimmedLine = Trim(line);
+            if (trimmedLine.empty()) {
+                continue;
+            }
 
-        // If line contains a colon, it's a device name
-        if (line.find(':') != string::npos) {
-            currentName = line.substr(0, line.find(':'));
-        }
-        // If line starts with /dev/video, it's a device path
-        else if (line.find("/dev/video") == 0 && !currentName.empty()) {
-            // Only add if we don't have this camera yet
-            if (cameras.find(currentName) == cameras.end()) {
-                cameras[currentName] = line;
+            if (trimmedLine.find(':') != string::npos) {
+                currentName = Trim(trimmedLine.substr(0, trimmedLine.find(':')));
+            } else if (trimmedLine.rfind("/dev/video", 0) == 0) {
+                addCamera(currentName, trimmedLine);
             }
         }
+
+        pclose(pipe);
+
+        if (!cameras.empty()) {
+            return cameras;
+        }
     }
 
-    pclose(pipe);
+    // Fallback: enumerate /sys/class/video4linux
+    DIR* dir = opendir("/sys/class/video4linux");
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (entry->d_name[0] == '.') {
+                continue;
+            }
+
+            string node(entry->d_name);
+            if (node.rfind("video", 0) != 0) {
+                continue;
+            }
+
+            string devicePath = string("/dev/") + node;
+            if (access(devicePath.c_str(), F_OK) != 0) {
+                continue;
+            }
+
+            string namePath = string("/sys/class/video4linux/") + node + "/name";
+            ifstream nameFile(namePath);
+            string cameraName;
+            if (nameFile.good()) {
+                getline(nameFile, cameraName);
+                cameraName = Trim(cameraName);
+            }
+
+            addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+        }
+        closedir(dir);
+
+        if (!cameras.empty()) {
+            return cameras;
+        }
+    } else {
+        LOG_LNX_ERR("Failed to open /sys/class/video4linux for enumeration");
+    }
+
+    // Final fallback: probe /dev/video[0-63]
+    for (int index = 0; index < 64; ++index) {
+        string devicePath = string("/dev/video") + to_string(index);
+        if (access(devicePath.c_str(), F_OK) == 0) {
+            addCamera("Video Device " + to_string(index), devicePath);
+        }
+    }
+
     return cameras;
 }
 
@@ -564,10 +654,28 @@ namespace Capture {
     static std::atomic<bool> g_isCapturing{false};
     static Napi::ThreadSafeFunction g_callbackFunction;
 
+    Napi::Value ListAvailableCameras(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+
+        auto cameras = GetAvailableCameras();
+        Napi::Array result = Napi::Array::New(env, cameras.size());
+
+        uint32_t index = 0;
+        for (const auto& entry : cameras) {
+            Napi::Object camera = Napi::Object::New(env);
+            camera.Set("name", Napi::String::New(env, entry.first));
+            camera.Set("path", Napi::String::New(env, entry.second));
+            result.Set(index++, camera);
+        }
+
+        return result;
+    }
+
     Napi::Object Init(Napi::Env env, Napi::Object exports) {
         exports.Set(Napi::String::New(env, "start"), Napi::Function::New(env, Capture::Start));
         exports.Set(Napi::String::New(env, "stop"), Napi::Function::New(env, Capture::Stop));
         exports.Set(Napi::String::New(env, "getFrame"), Napi::Function::New(env, Capture::GetFrame));
+        exports.Set(Napi::String::New(env, "listAvailableCameras"), Napi::Function::New(env, Capture::ListAvailableCameras));
         return exports;
     }
 
