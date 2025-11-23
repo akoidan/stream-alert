@@ -1,5 +1,5 @@
 #include "capture.h"
-#include "../../common/common.h"
+#include "../../shared/common/common.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>

@@ -8,10 +8,6 @@
 #include <sstream>
 #include <string>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 namespace stream_alert::logger {
 
 enum class Stream {
@@ -26,42 +22,13 @@ inline std::mutex& LogMutex() {
     return mutex;
 }
 
-#ifdef _WIN32
-inline void EnableAnsiColors() {
-    static bool enabled = false;
-    if (enabled) {
-        return;
-    }
-
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hOut == INVALID_HANDLE_VALUE) {
-        enabled = true;
-        return;
-    }
-
-    DWORD mode = 0;
-    if (!GetConsoleMode(hOut, &mode)) {
-        enabled = true;
-        return;
-    }
-
-#ifdef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(hOut, mode);
-#endif
-    enabled = true;
-}
-#else
 inline void EnableAnsiColors() {}
-#endif
 
 inline std::tm LocalTime(std::time_t timeValue) {
     std::tm result{};
-#ifdef _WIN32
-    localtime_s(&result, &timeValue);
-#else
-    localtime_r(&timeValue, &result);
-#endif
+    if (const std::tm* local = std::localtime(&timeValue)) {
+        result = *local;
+    }
     return result;
 }
 

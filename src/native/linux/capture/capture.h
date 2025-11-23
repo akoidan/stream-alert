@@ -6,7 +6,7 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
-#include "../../common/common.h"
+#include "../../shared/common/common.h"
 
 // Forward declarations
 struct v4l2_format;
