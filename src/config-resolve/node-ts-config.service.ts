@@ -1,6 +1,6 @@
 import {Injectable} from '@nestjs/common';
 import {IConfigResolver} from "@/config-resolve/config-resolve-model";
-import {Camera, Diff, IConfig, Telegram} from "node-ts-config";
+import type {Camera, Diff, IConfig, Telegram} from "node-ts-config";
 
 @Injectable()
 export class NodeTsConfigService implements IConfigResolver {

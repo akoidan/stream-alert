@@ -1,4 +1,4 @@
-import {Camera, Diff, IConfig, Telegram} from "node-ts-config";
+import type {Camera, Diff, IConfig, Telegram} from "node-ts-config";
 
 export const CameraConf = 'CameraConf';
 export const TelegramConfig = 'TelegramConfig';
