@@ -6,7 +6,8 @@ Get a Telegram notification when your webcam or screen changes on Windows OS.
 
 1. **Download the executable** from [GitHub Releases](https://github.com/akoidan/stream-alert/releases)
 2. **Run the executable** - it will guide you through the setup
-3. **Configure your Telegram bot** when prompted
+2. **Config** after setup is finished it will generate config file `stream-alert.json`, you can find documentation here [CONFIG.md](./CONFIG.md). Next time you run it, it won't ask the setup again 
+
 
 ## Setup Requirements
 
