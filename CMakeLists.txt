@@ -9,6 +9,10 @@ add_definitions(-DNAPI_VERSION=4)
 include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
 
+
+set(MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/main.cc")
+file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
+
 if (UNIX AND APPLE)
     message(STATUS "macOS build - not supported")
 elseif (WIN32)
@@ -22,12 +26,11 @@ if(WIN32)
     # Windows build
 
     include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/headers)
-    include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
+    include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/headers)
 
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/win32/*.cc")
-    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
-    set(MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/win32/main.cc")
-    set(SOURCE_FILES ${CAPTURE_SOURCES} ${IMAGEPROC_SOURCES} ${MAIN_SOURCE} ${HEADERS})
+
+    set(SOURCE_FILES ${CC_FILES} ${MAIN_SOURCE})
     
     add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
@@ -43,12 +46,10 @@ elseif(UNIX AND NOT APPLE)
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
 
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
-    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/*.cc")
 
-    set(LINUX_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/linux/main.cc")
-    set(SOURCE_FILES ${HEADERS} ${SHARED_HEADERS} ${CC_FILES} ${CC_SHARED_FILES})
+    set(SOURCE_FILES ${CC_FILES} ${MAIN_SOURCE})
     
-    add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+    add_library(${PROJECT_NAME} ${SOURCE_FILES} ${CMAKE_JS_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
     
     # Link libraries
