@@ -2,6 +2,7 @@ import {Logger, Module} from '@nestjs/common';
 import {CameraConfData, DiffConfData, IConfigResolver, TelegramConfigData} from "@/config/config-resolve-model";
 import {SimpleConfigService} from "@/config/simple-config.service";
 import {isSea} from "node:sea";
+import {ReaderConfigService} from "@/config/reader-config.service";
 
 
 @Module({
@@ -12,7 +13,7 @@ import {isSea} from "node:sea";
       provide: SimpleConfigService,
       inject: [Logger],
       useFactory: async (logger: Logger): Promise<SimpleConfigService> => {
-        const data = new SimpleConfigService(logger, isSea() ? __dirname : process.cwd());
+        const data = new ReaderConfigService(logger, isSea() ? __dirname : process.cwd());
         await data.load()
         return data;
       },

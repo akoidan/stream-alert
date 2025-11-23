@@ -8,8 +8,9 @@ import {CameraConfig, Config, configSchema, DiffConfig, TelegramConfig} from "@/
 export class SimpleConfigService implements IConfigResolver{
   protected data: Config = null!;
   constructor(
-    private readonly logger: Logger,
-    private readonly configsPath: string) {
+    protected readonly logger: Logger,
+    protected readonly configsPath: string
+  ) {
   }
 
 
