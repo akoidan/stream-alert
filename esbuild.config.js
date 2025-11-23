@@ -19,7 +19,7 @@ esbuild.build({
     // which confuses esbuild trying to resolve it
     '@nestjs/websockets', '@nestjs/microservices', '@nestjs/websockets/socket-module',
     '@nestjs/microservices/microservices-module', 'class-validator', 'class-transformer',
-    '@nestjs/platform-express', '@nestjs/config'
+    '@nestjs/platform-express', '@nestjs/config', 'bindings'
   ],
   plugins: [
     {
