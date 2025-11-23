@@ -1,6 +1,6 @@
 import {Logger, Module} from '@nestjs/common';
 import {CameraConfData, DiffConfData, IConfigResolver, TelegramConfigData} from "@/config/config-resolve-model";
-import {SeaConfigService} from "@/config/sea-config.service";
+import {SimpleConfigService} from "@/config/simple-config.service";
 import {isSea} from "node:sea";
 
 
@@ -9,10 +9,10 @@ import {isSea} from "node:sea";
   providers: [
     Logger,
     {
-      provide: SeaConfigService,
+      provide: SimpleConfigService,
       inject: [Logger],
-      useFactory: async (logger: Logger): Promise<SeaConfigService> => {
-        const data = new SeaConfigService(logger, isSea() ? __dirname : process.cwd());
+      useFactory: async (logger: Logger): Promise<SimpleConfigService> => {
+        const data = new SimpleConfigService(logger, isSea() ? __dirname : process.cwd());
         await data.load()
         return data;
       },
@@ -20,17 +20,17 @@ import {isSea} from "node:sea";
     {
       provide: DiffConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
-      inject: [SeaConfigService],
+      inject: [SimpleConfigService],
     },
     {
       provide: CameraConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getCameraConfig(),
-      inject: [SeaConfigService],
+      inject: [SimpleConfigService],
     },
     {
       provide: TelegramConfigData,
       useFactory: (resolver: IConfigResolver) => resolver.getTGConfig(),
-      inject: [SeaConfigService],
+      inject: [SimpleConfigService],
     }
   ],
 })

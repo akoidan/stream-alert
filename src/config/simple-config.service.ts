@@ -5,15 +5,15 @@ import path from "path";
 import {CameraConfig, Config, configSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
-export class SeaConfigService implements IConfigResolver{
-  private data: Config = null!;
+export class SimpleConfigService implements IConfigResolver{
+  protected data: Config = null!;
   constructor(
     private readonly logger: Logger,
     private readonly configsPath: string) {
   }
 
 
-  private get confPath():string {
+  protected get confPath():string {
     return path.join(this.configsPath, 'stream-alert.json');
   };
 
