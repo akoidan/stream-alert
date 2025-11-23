@@ -43,38 +43,14 @@ jobs:
     needs: [ create_release ]
     permissions: write-all
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-#      - name: Cache APT Packages
-#        uses: actions/cache@v4
-#        with:
-#          path: /var/cache/apt/archives
-#          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yaml') }}
-#          restore-keys: |
-#            apt-cache-${{ runner.os }}-
-#
-#      - name: Install dependencies
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y --no-install-recommends libx11-dev libxtst-dev libxcb-ewmh-dev libxcb1-dev cmake g++ make
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: yarn
-      - name: Install yarn deps
-        if: steps.cache-node.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Cache node_modules cache
-        id: cache-node
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn deps
-        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules
@@ -106,19 +82,13 @@ jobs:
     permissions: write-all
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
-
-      - name: Cache node_modules cache
-        id: cache-node
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+          cache: yarn
 
       - name: Install yarn deps
-        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules
