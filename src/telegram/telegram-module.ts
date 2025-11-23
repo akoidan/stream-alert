@@ -1,10 +1,9 @@
-/// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
 import {TelegramService} from "@/telegram/telegram-service";
 import {Telegraf} from "telegraf";
-import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
-import {TelegramConfig} from "@/config-resolve/config-resolve-model";
-import type {Telegram} from "node-ts-config";
+import {ConfigResolveModule} from "@/config/config-resolve-module";
+import {TelegramConfigData} from "@/config/config-resolve-model";
+import {TelegramConfig} from "@/config/config-zod-schema";
 
 @Module({
   imports: [ConfigResolveModule],
@@ -14,10 +13,10 @@ import type {Telegram} from "node-ts-config";
     TelegramService,
     {
       provide: Telegraf,
-      useFactory: (tg: Telegram): Telegraf => {
+      useFactory: (tg: TelegramConfig): Telegraf => {
         return new Telegraf(tg.token);
       },
-      inject: [TelegramConfig],
+      inject: [TelegramConfigData],
     },
   ],
 })

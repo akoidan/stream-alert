@@ -1,8 +1,7 @@
-/// <reference path="../config/Config.d.ts" />
 import {Logger, Module} from '@nestjs/common';
 import {StreamService} from "@/stream/stream-service";
 import {NativeModule} from "@/native/native-module";
-import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
+import {ConfigResolveModule} from "@/config/config-resolve-module";
 
 @Module({
   imports: [NativeModule, ConfigResolveModule],

@@ -1,12 +1,8 @@
 import process from 'node:process';
-// @ts-ignore
-import prompts from 'prompts';
 import {CustomLogger} from '@/app/custom-logger';
 import {AppModule} from '@/app/app-module';
 import {NestFactory} from '@nestjs/core';
-import {globalSeaConf} from '@/config-resolve/config-resolve-model';
 import {getAsset} from 'node:sea';
-
 
 process.removeAllListeners('warning');
 process.on('warning', (warning) => {
@@ -17,9 +13,6 @@ process.on('warning', (warning) => {
 });
 
 const customLogger = new CustomLogger();
-
-const text = getAsset('config-default-json', 'utf8');
-globalSeaConf.data = JSON.parse(text);
 
 function getInitial<T>(value: T): T|undefined {
   return typeof value === 'string' && value.startsWith('@@') ? undefined : value;
@@ -95,6 +88,9 @@ function getConfigQuestions() {
 }
 
 async function bootstrap(): Promise<void> {
+  const text = getAsset('config-default-json', 'utf8');
+
+
   
   customLogger.log('🔧 Stream Alert Configuration');
   customLogger.log('================================\n');

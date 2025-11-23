@@ -3,8 +3,8 @@ import {Telegraf} from "telegraf";
 import {TelegramCommands} from "@/telegram/telegram-model";
 import type {TgCommandsExecutor} from "@/app/app-model";
 import {CommandContextExtn} from "telegraf/typings/telegram-types";
-import type {Telegram} from "node-ts-config";
-import {TelegramConfig} from "@/config-resolve/config-resolve-model";
+import {TelegramConfigData} from "@/config/config-resolve-model";
+import {TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
 export class TelegramService {
@@ -13,8 +13,8 @@ export class TelegramService {
   constructor(
     private readonly logger: Logger,
     private readonly bot: Telegraf,
-    @Inject(TelegramConfig)
-    private readonly tgConfig: Telegram,
+    @Inject(TelegramConfigData)
+    private readonly tgConfig: TelegramConfig,
   ) {
     // Set last notification time to 3 seconds ago to allow for initial setup
     this.lastNotificationTime = Date.now() - (this.tgConfig.spamDelay - this.tgConfig.initialDelay) * 1000

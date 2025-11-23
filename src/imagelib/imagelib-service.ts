@@ -1,7 +1,7 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {FrameData, INativeModule, Native} from '@/native/native-model';
-import type {Diff} from "node-ts-config";
-import {DiffConf} from "@/config-resolve/config-resolve-model";
+import {DiffConfData} from "@/config/config-resolve-model";
+import {DiffConfig} from "@/config/config-zod-schema";
 
 @Injectable()
 export class ImagelibService {
@@ -11,8 +11,8 @@ export class ImagelibService {
     private readonly logger: Logger,
     @Inject(Native)
     private readonly native: INativeModule,
-    @Inject(DiffConf)
-    public readonly conf: Diff,
+    @Inject(DiffConfData)
+    public readonly conf: DiffConfig,
   ) {
   }
 
