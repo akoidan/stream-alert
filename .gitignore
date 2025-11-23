@@ -3,18 +3,9 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 .idea
-src/config/user
 /build
 .vscode/*
 .vs
 dist
 out
-/scripts/image.bmp
-/scripts/commandcam.exe
-/scripts/commandcam.obj
-/scripts/qedit.tlh
-
-# SEA (Single Executable Application) build artifacts
-*.exe
-sea-prep.blob
-sea-prep.blob
+stream-alert.json

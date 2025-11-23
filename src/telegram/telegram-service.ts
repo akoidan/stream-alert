@@ -3,8 +3,8 @@ import {Telegraf} from "telegraf";
 import {TelegramCommands} from "@/telegram/telegram-model";
 import type {TgCommandsExecutor} from "@/app/app-model";
 import {CommandContextExtn} from "telegraf/typings/telegram-types";
-import type {Telegram} from "node-ts-config";
-import {TelegramConfig} from "@/config-resolve/config-resolve-model";
+import {TelegramConfigData} from "@/config/config-resolve-model";
+import {TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
 export class TelegramService {
@@ -13,8 +13,8 @@ export class TelegramService {
   constructor(
     private readonly logger: Logger,
     private readonly bot: Telegraf,
-    @Inject(TelegramConfig)
-    private readonly tgConfig: Telegram,
+    @Inject(TelegramConfigData)
+    private readonly tgConfig: TelegramConfig,
   ) {
     // Set last notification time to 3 seconds ago to allow for initial setup
     this.lastNotificationTime = Date.now() - (this.tgConfig.spamDelay - this.tgConfig.initialDelay) * 1000
@@ -22,6 +22,10 @@ export class TelegramService {
 
   async setup(commandListener: TgCommandsExecutor): Promise<void> {
     this.logger.log("Starting telegram service");
+    
+    // Validate token first
+    await this.validateToken();
+    
     await this.bot.telegram.setMyCommands([
       {command: TelegramCommands.image, description: "Get the last image"},
       {
@@ -42,6 +46,15 @@ export class TelegramService {
     this.bot.command(TelegramCommands.increase_threshold, () => commandListener.onIncreaseThreshold());
     this.bot.command(TelegramCommands.decrease_threshold, () => commandListener.onDecreaseThreshold());
     await this.bot.launch();
+  }
+
+  private async validateToken(): Promise<void> {
+    try {
+      const botInfo = await this.bot.telegram.getMe();
+      this.logger.log(`Telegram bot validated: @${botInfo.username} (${botInfo.first_name})`);
+    } catch (error) {
+      throw new Error('Telegram token validation failed. Please check your bot token.');
+    }
   }
 
   async sendText(text: string): Promise<void> {
