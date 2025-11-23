@@ -1,6 +1,6 @@
 import {Injectable} from '@nestjs/common';
 import {GlobalSeaConf, IConfigResolver} from "@/config-resolve/config-resolve-model";
-import {Camera, Diff, Telegram} from "node-ts-config";
+import type {Camera, Diff, Telegram} from "node-ts-config";
 
 @Injectable()
 export class SeaConfigService implements IConfigResolver{

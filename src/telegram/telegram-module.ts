@@ -4,7 +4,7 @@ import {TelegramService} from "@/telegram/telegram-service";
 import {Telegraf} from "telegraf";
 import {ConfigResolveModule} from "@/config-resolve/config-resolve-module";
 import {TelegramConfig} from "@/config-resolve/config-resolve-model";
-import {Telegram} from "node-ts-config";
+import type {Telegram} from "node-ts-config";
 
 @Module({
   imports: [ConfigResolveModule],

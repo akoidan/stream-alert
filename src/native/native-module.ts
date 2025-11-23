@@ -1,5 +1,4 @@
 import {Inject, Logger, Module, OnModuleInit} from '@nestjs/common';
-import bindings from 'bindings';
 import {INativeModule, Native} from "@/native/native-model";
 import clc from "cli-color";
 import {getAsset, isSea} from "node:sea";
@@ -22,6 +21,8 @@ import {createRequire} from 'node:module';
           const requireFromHere = createRequire(__filename);
           return requireFromHere(pathOnDisk)
         } else {
+          // do not require in on production app
+          const bindings = require('bindings');
           return bindings('native');
         }
       },

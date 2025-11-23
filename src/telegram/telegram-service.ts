@@ -16,7 +16,8 @@ export class TelegramService {
     @Inject(TelegramConfig)
     private readonly tgConfig: Telegram,
   ) {
-    this.lastNotificationTime = Date.now()
+    // Set last notification time to 3 seconds ago to allow for initial setup
+    this.lastNotificationTime = Date.now() - (this.tgConfig.spamDelay - this.tgConfig.initialDelay) * 1000
   }
 
   async setup(commandListener: TgCommandsExecutor): Promise<void> {
@@ -50,7 +51,7 @@ export class TelegramService {
   async sendImage(data: Buffer): Promise<void> {
     const newNotificationTime = Date.now();
     const diffDate = newNotificationTime - this.lastNotificationTime;
-    if (diffDate > this.tgConfig.spamDelay) {
+    if (diffDate > this.tgConfig.spamDelay * 1000) {
       await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
       this.lastNotificationTime = newNotificationTime;
       this.logger.log("Notification sent");
