@@ -47,6 +47,7 @@ private:
     int width_ = 0;
     int height_ = 0;
     int fps_ = 0;
+    uint32_t pixelFormat_ = 0;
     std::string deviceName_;
 };
 

@@ -8,7 +8,8 @@ add_definitions(-DNAPI_VERSION=4)
 
 include_directories(${CMAKE_JS_INC})
 include_directories(${CMAKE_SOURCE_DIR}/node_modules/node-addon-api)
-include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/vendor)
+include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/imageproc)
+include_directories(${CMAKE_SOURCE_DIR}/src/native/shared/vendor)
 include_directories(${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/headers)
 
 if (UNIX AND APPLE)
@@ -24,10 +25,9 @@ if(WIN32)
     # Windows build
     file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/win32/capture/headers/**.h")
     file(GLOB_RECURSE CAPTURE_SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/capture/**.cc")
-    file(GLOB_RECURSE IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/**.cc")
-    file(GLOB JPEG_C_SOURCES "${CMAKE_SOURCE_DIR}/src/native/win32/imageproc/*.c")
+    file(GLOB_RECURSE IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/shared/imageproc/**.cc")
     set(MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/win32/main.cc")
-    set(SOURCE_FILES ${CAPTURE_SOURCES} ${IMAGEPROC_SOURCES} ${JPEG_C_SOURCES} ${MAIN_SOURCE} ${HEADERS})
+    set(SOURCE_FILES ${CAPTURE_SOURCES} ${IMAGEPROC_SOURCES} ${MAIN_SOURCE} ${HEADERS})
     
     add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
@@ -45,8 +45,9 @@ elseif(UNIX AND NOT APPLE)
     # Source files
     file(GLOB_RECURSE COMMON_HEADERS "${CMAKE_SOURCE_DIR}/src/native/common/**.h")
     file(GLOB_RECURSE LINUX_CAPTURE_SOURCES "${CMAKE_SOURCE_DIR}/src/native/linux/capture/**.cc")
+    file(GLOB_RECURSE SHARED_IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/shared/imageproc/**.cc")
     set(LINUX_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/linux/main.cc")
-    set(SOURCE_FILES ${LINUX_CAPTURE_SOURCES} ${LINUX_MAIN_SOURCE} ${COMMON_HEADERS})
+    set(SOURCE_FILES ${LINUX_CAPTURE_SOURCES} ${SHARED_IMAGEPROC_SOURCES} ${LINUX_MAIN_SOURCE} ${COMMON_HEADERS})
     
     add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")

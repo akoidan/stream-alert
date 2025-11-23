@@ -15,6 +15,40 @@
 #include <sstream>
 #include <map>
 #include <algorithm>
+#include <array>
+#include <vector>
+#include <setjmp.h>
+
+#include <jpeglib.h>
+
+namespace {
+    inline uint8_t ClampToByte(int value) {
+        return static_cast<uint8_t>(std::min(std::max(value, 0), 255));
+    }
+
+    inline std::array<uint8_t, 3> YuvToRgb(uint8_t y, uint8_t u, uint8_t v) {
+        int c = static_cast<int>(y) - 16;
+        int d = static_cast<int>(u) - 128;
+        int e = static_cast<int>(v) - 128;
+
+        int r = (298 * c + 409 * e + 128) >> 8;
+        int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+        int b = (298 * c + 516 * d + 128) >> 8;
+
+        return {ClampToByte(r), ClampToByte(g), ClampToByte(b)};
+    }
+
+    struct JpegErrorManager {
+        jpeg_error_mgr pub;
+        jmp_buf setjmpBuffer;
+    };
+
+    void JpegErrorExit(j_common_ptr cinfo) {
+        auto* err = reinterpret_cast<JpegErrorManager*>(cinfo->err);
+        (*cinfo->err->output_message)(cinfo);
+        longjmp(err->setjmpBuffer, 1);
+    }
+}
 
 using namespace std;
 
@@ -209,6 +243,8 @@ bool LinuxCapture::InitDevice(int width, int height, int fps) {
          << (char)((fmt.fmt.pix.pixelformat >> 16) & 0xFF)
          << (char)((fmt.fmt.pix.pixelformat >> 24) & 0xFF)
          << " (" << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << ")" << endl;
+
+    pixelFormat_ = fmt.fmt.pix.pixelformat;
 
     // Set frame rate
     v4l2_streamparm parm = {};
@@ -439,9 +475,88 @@ FrameData* LinuxCapture::GetFrame() {
     FrameData* frame = new FrameData();
     frame->width = width_;
     frame->height = height_;
-    frame->dataSize = buf.bytesused;
-    frame->buffer.resize(buf.bytesused);
-    memcpy(frame->buffer.data(), buffers_[buf.index]->start, buf.bytesused);
+
+    if (pixelFormat_ == V4L2_PIX_FMT_YUYV) {
+        size_t expectedSize = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3;
+        frame->buffer.resize(expectedSize);
+        const uint8_t* src = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        uint8_t* dst = frame->buffer.data();
+
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; x += 2) {
+                size_t yuyvIndex = (y * width_ + x) * 2;
+                uint8_t y0 = src[yuyvIndex + 0];
+                uint8_t u  = src[yuyvIndex + 1];
+                uint8_t y1 = src[yuyvIndex + 2];
+                uint8_t v  = src[yuyvIndex + 3];
+
+                auto rgb0 = YuvToRgb(y0, u, v);
+                auto rgb1 = YuvToRgb(y1, u, v);
+
+                size_t rgbIndex = (static_cast<size_t>(y) * width_ + x) * 3;
+                dst[rgbIndex + 0] = rgb0[0];
+                dst[rgbIndex + 1] = rgb0[1];
+                dst[rgbIndex + 2] = rgb0[2];
+                dst[rgbIndex + 3] = rgb1[0];
+                dst[rgbIndex + 4] = rgb1[1];
+                dst[rgbIndex + 5] = rgb1[2];
+            }
+        }
+
+        frame->dataSize = frame->buffer.size();
+    } else if (pixelFormat_ == V4L2_PIX_FMT_MJPEG) {
+        const uint8_t* mjpegData = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        size_t mjpegSize = buf.bytesused;
+
+        JpegErrorManager jerr;
+        jpeg_decompress_struct cinfo;
+        cinfo.err = jpeg_std_error(&jerr.pub);
+        jerr.pub.error_exit = JpegErrorExit;
+
+        if (setjmp(jerr.setjmpBuffer)) {
+            jpeg_destroy_decompress(&cinfo);
+            cerr << "Failed to decode MJPEG frame" << endl;
+            delete frame;
+            return nullptr;
+        }
+
+        jpeg_create_decompress(&cinfo);
+        jpeg_mem_src(&cinfo, const_cast<unsigned char*>(mjpegData), static_cast<unsigned long>(mjpegSize));
+
+        if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
+            jpeg_destroy_decompress(&cinfo);
+            cerr << "Invalid MJPEG header" << endl;
+            delete frame;
+            return nullptr;
+        }
+
+        cinfo.out_color_space = JCS_RGB;
+
+        jpeg_start_decompress(&cinfo);
+
+        if (static_cast<int>(cinfo.output_width) != width_ || static_cast<int>(cinfo.output_height) != height_) {
+            cerr << "MJPEG dimensions mismatch: expected " << width_ << "x" << height_
+                 << ", got " << cinfo.output_width << "x" << cinfo.output_height << endl;
+        }
+
+        size_t rowStride = cinfo.output_width * cinfo.output_components;
+        frame->buffer.resize(static_cast<size_t>(cinfo.output_height) * rowStride);
+
+        while (cinfo.output_scanline < cinfo.output_height) {
+            unsigned char* rowPtr = frame->buffer.data() + cinfo.output_scanline * rowStride;
+            jpeg_read_scanlines(&cinfo, &rowPtr, 1);
+        }
+
+        jpeg_finish_decompress(&cinfo);
+        jpeg_destroy_decompress(&cinfo);
+
+        frame->dataSize = frame->buffer.size();
+    } else {
+        // Unknown format, copy raw data as-is
+        frame->buffer.resize(buf.bytesused);
+        memcpy(frame->buffer.data(), buffers_[buf.index]->start, buf.bytesused);
+        frame->dataSize = frame->buffer.size();
+    }
 
     cout << "Captured frame from buffer " << buf.index
          << " (" << frame->dataSize << " bytes, " << frame->width
