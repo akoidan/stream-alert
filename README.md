@@ -2,25 +2,34 @@
 
 Get a Telegram notification when your webcam or screen changes on Windows OS.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Requirements](#requirements)
+- [Camera Setup](#camera-setup)
+- [How It Works](#how-it-works)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+
 ## Quick Start
 
 1. **Download the executable** from [GitHub Releases](https://github.com/akoidan/stream-alert/releases)
 2. **Run the executable** - it will guide you through the setup
-2. **Config** after setup is finished it will generate config file `stream-alert.json`, you can find documentation here [CONFIG.md](./CONFIG.md). Next time you run it, it won't ask the setup again 
+3. **Configuration** - after setup finishes, it generates `stream-alert.json`. See [CONFIG.md](./CONFIG.md) for documentation
 
+## Requirements
 
-## Setup Requirements
+- **Windows OS**
+- **Webcam** (physical or virtual)
+- **Telegram** account
 
-You need 
-- windows os
-- webcamera
-- [telegram](https://telegram.org/)
+## Camera Setup
 
-### Camera Options
-- **Webcam**: Use your physical webcam
-- **Virtual Camera**: Use OBS Virtual Camera for screen monitoring
+### Option 1: Physical Webcam
+Use your built-in or USB webcam directly.
 
-### OBS Virtual Camera Setup (for screen monitoring)
+### Option 2: OBS Virtual Camera (for screen monitoring)
 1. Install [OBS](https://obsproject.com/) or run `choco install obs`
 2. Launch OBS and capture the window/screen you want to monitor
 3. Click `Start Virtual Camera`
@@ -34,13 +43,20 @@ The app monitors your camera feed and sends Telegram alerts when:
 ## Configuration
 
 When you first run the app, you'll be asked to configure:
-- **Bot Token**: Get this from telegram bot `@BotFather`
-- **Chat ID**: Get this from telegram bot `@userinfobot`  
+- **Bot Token**: Get from Telegram bot `@BotFather`
+- **Chat ID**: Get from Telegram bot `@userinfobot`  
 - **Alert Delay**: Minimum time between alerts (10+ seconds recommended)
 - **Alert Message**: Custom message for notifications
-- **Camera**: You can get the name e.g. -> https://meet.google.com/ and create an instant call ->  Settings > Video and check the camera list
+- **Camera**: Choose from available cameras
 - **Frame Rate**: How often to check for changes (1-5 FPS recommended)
 - **Sensitivity**: How much change triggers an alert (try 0.1)
+
+## Troubleshooting
+
+- **Camera not found**: Check camera name in device manager or use Google Meet settings to see available cameras
+- **No Telegram notifications**: Verify bot token and chat ID are correct
+- **Too many notifications**: Increase alert delay or sensitivity
+- **Too few notifications**: Decrease sensitivity or alert delay
 
 ## Development
 

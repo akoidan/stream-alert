@@ -46,13 +46,13 @@ export const diffSchema = z.object({
     .default(0.1),
 });
 
-export const configSchema = z.object({
+export const aconfigSchema = z.object({
   telegram: telegramSchema,
   camera: cameraSchema,
   diff: diffSchema,
 });
 
-type Config = z.infer<typeof configSchema>
+type Config = z.infer<typeof aconfigSchema>
 type TelegramConfig = z.infer<typeof telegramSchema>
 type CameraConfig = z.infer<typeof cameraSchema>
 type DiffConfig = z.infer<typeof diffSchema>

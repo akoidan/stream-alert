@@ -2,7 +2,7 @@ import {Injectable, Logger} from '@nestjs/common';
 import {IConfigResolver} from "@/config/config-resolve-model";
 import {promises as fs} from "fs";
 import path from "path";
-import {CameraConfig, Config, configSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
+import {CameraConfig, Config, aconfigSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
 export class FileConfigReader implements IConfigResolver{
@@ -20,7 +20,7 @@ export class FileConfigReader implements IConfigResolver{
 
   public async load() {
     const data = await fs.readFile(this.confPath, 'utf8');
-    this.data = await configSchema.parseAsync(JSON.parse(data));
+    this.data = await aconfigSchema.parseAsync(JSON.parse(data));
   }
 
   public getTGConfig(): TelegramConfig {

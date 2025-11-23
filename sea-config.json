@@ -2,7 +2,6 @@
   "main": "dist/sea-bundle.js",
   "output": "dist/sea-prep.blob",
   "assets": {
-    "native": "dist/Debug/native.node",
-    "config-default-json": "dist/config/default.json"
+    "native": "build/Release/native.node"
   }
 }

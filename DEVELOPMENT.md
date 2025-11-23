@@ -8,17 +8,17 @@ This guide covers building Stream Alert from source on Windows.
 - Install [Telegram](https://telegram.org/) if you don't have it
 - Create a new bot using @BotFather chat in Telegram
 - Use `/newbot` command and follow the instructions until you finish creating your bot
-- Copy token to file `src/config/default.json` at path `telegram.token`
+- Copy token to file `stream-alert.json` at path `telegram.token`
 - Find your bot in Telegram and send a few messages to it
 - Find another bot named `@userinfobot` and type `/start` there - you'll get your chat ID
-- Put the chat ID into `src/config/default.json` at path `telegram.chatId`
+- Put the chat ID into `stream-alert.json` at path `telegram.chatId`
 
 ### Camera Input Options
 
 You need either a real physical webcam or a virtual webcam.
 
 #### Physical Webcam
-For a real physical webcam, specify its name in `src/config/default.json` at path `camera.name`.
+For a real physical webcam, specify its name in `stream-alert.json` at path `camera.name`.
 You can get the camera name from any software that reads cameras. For example:
 1. Join https://meet.google.com/ and create an instant call
 2. Go to Settings > Video and check the camera list
@@ -32,7 +32,7 @@ For screen capture, you need OBS with virtual camera feature:
 4. Try to fit only the area you need to monitor:
    - Right-click on the window > `Resize output (Source size)`
    - Right-click on dark area > `Preview scaling`
-5. Specify `OBS Virtual Camera` in `src/config/default.json` at path `camera.name`
+5. Specify `OBS Virtual Camera` in `stream-alert.json` at path `camera.name`
 
 ### Development Tools
 
@@ -51,7 +51,7 @@ For screen capture, you need OBS with virtual camera feature:
 
 ## Configuration
 
-Config file is located at `src/config/default.json`, or you can use `src/config/user/[username].json` which is in gitignore.
+Config file is located at `stream-alert.json`, or you can use `src/config/user/[username].json` which is in gitignore.
 
 ### Configuration Options
 - `diff.pixels` - Minimum number of pixels that must change to trigger a notification
@@ -81,7 +81,7 @@ The build process involves several steps:
    ```bash
    yarn cmake
    ```
-   - Builds Node.js native modules to `build/Debug/native.node`
+   - Builds Node.js native modules to `build/Release/native.node`
 
 2. **Compile TypeScript**:
    ```bash
@@ -109,18 +109,17 @@ The build process involves several steps:
 yarn build
 ```
 
-
 ## Debugging
 
 ### Typescript file
 
 - Use `yarn debug` and you can open debugger at chrome://inspect, or just you your ide with `yarn start`
-- Check `src/config/default.json` for configuration issues
+- Check `stream-alert.json` for configuration issues
 - Verify Telegram bot token and chat ID are correct
 - Ensure camera name matches exactly what's available on your system
 
 
 ### C++ files
-
-Native addon is already built in debug mode. The project is build using MS Visual ++, which means it produces the build in debug folder which is compatible with `cdb`.
+Yarn `yarn cmake:debug`, this will output `build/Debug/native.node`, which will be loaded automatically.
+The project is build using MS Visual ++, which means it produces the build in debug folder which is compatible with `cdb`.
 Run `yarn start`, and then attach to a remote process (this nodejs process) from Visual ++, it should automatically pull debug symbols and breakpoint should work.

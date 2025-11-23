@@ -1,4 +1,16 @@
-# 'Config
+# 'Config'
+
+## Aconfig
+
+_Object containing the following properties:_
+
+| Property            | Type                  |
+| :------------------ | :-------------------- |
+| **`telegram`** (\*) | [Telegram](#telegram) |
+| **`camera`** (\*)   | [Camera](#camera)     |
+| **`diff`** (\*)     | [Diff](#diff)         |
+
+_(\*) Required._
 
 ## Camera
 
@@ -10,18 +22,6 @@ _Object containing the following properties:_
 | `frameRate` | 🎬 Frame rate in frames per second (recommended: 1-5)      | `number` (_>0_)            | `1`                    |
 
 _All properties are optional._
-
-## Config
-
-_Object containing the following properties:_
-
-| Property            | Type                  |
-| :------------------ | :-------------------- |
-| **`telegram`** (\*) | [Telegram](#telegram) |
-| **`camera`** (\*)   | [Camera](#camera)     |
-| **`diff`** (\*)     | [Diff](#diff)         |
-
-_(\*) Required._
 
 ## Diff
 

@@ -1,5 +1,5 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {configSchema} from "@/config/config-zod-schema";
+import {aconfigSchema} from "@/config/config-zod-schema";
 import {FileConfigReader} from "@/config/file-config-reader.service";
 import prompts from 'prompts';
 import {promises as fs} from "fs";
@@ -33,7 +33,7 @@ export class PromptConfigReader extends FileConfigReader {
 
     const questions: any[] = [];
 
-    this.addQuestions('', configSchema, questions);
+    this.addQuestions('', aconfigSchema, questions);
 
     const responses = await prompts(questions);
     

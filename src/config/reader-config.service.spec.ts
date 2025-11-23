@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { PromptConfigReader } from './promt-config-reader.service';
-import { configSchema } from './config-zod-schema';
+import { aconfigSchema } from './config-zod-schema';
 import prompts from 'prompts';
 
 // Mock the prompts module
@@ -36,7 +36,7 @@ describe('ReaderConfigService', () => {
     it('should create questions for all primitive fields in the schema', () => {
       // Use the addQuestions method directly since createQuestionsFromSchema was removed
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
       
       expect(questions.length).toBeGreaterThan(0);
       
@@ -53,7 +53,7 @@ describe('ReaderConfigService', () => {
 
     it('should use correct types for different field types', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
 
       const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
       const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
@@ -66,7 +66,7 @@ describe('ReaderConfigService', () => {
 
     it('should use default values from Zod schema', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
 
       const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
       const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
@@ -81,7 +81,7 @@ describe('ReaderConfigService', () => {
   describe('validation', () => {
     it('should validate telegram token format', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
       
       const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
       const validate = tokenQuestion.validate;
@@ -95,7 +95,7 @@ describe('ReaderConfigService', () => {
 
     it('should validate chat ID format', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
       
       const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
       const validate = chatIdQuestion.validate;
@@ -109,7 +109,7 @@ describe('ReaderConfigService', () => {
 
     it('should validate frame rate', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
       
       const frameRateQuestion = questions.find((q: any) => q.name === 'camera.frameRate');
       const validate = frameRateQuestion.validate;
@@ -124,7 +124,7 @@ describe('ReaderConfigService', () => {
 
     it('should validate threshold range', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', configSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions);
       
       const thresholdQuestion = questions.find((q: any) => q.name === 'diff.threshold');
       const validate = thresholdQuestion.validate;

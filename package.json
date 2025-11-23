@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "schema": "zod2md --entry ./src/config/config-zod-schema.ts --title 'Config Schema' --output CONFIG.md",
+    "schema": "zod2md --entry ./src/config/config-zod-schema.ts --title 'Config' --output CONFIG.md",
     "debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
-    "cmake": "cmake-js build --debug",
+    "cmake": "cmake-js build",
+    "cmake:debug": "cmake-js build --debug",
     "nest": "nest build",
     "build": "npm-run-all -s cmake nest esbuild native",
     "esbuild": "node esbuild.config.js",
@@ -50,7 +51,8 @@
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod2md": "^0.2.4"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -60,7 +62,6 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "7.1.0",
     "telegraf": "^4.16.3",
-    "zod": "^4.1.12",
-    "zod2md": "^0.2.4"
+    "zod": "^4.1.12"
   }
 }
