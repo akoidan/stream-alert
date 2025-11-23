@@ -1,11 +1,11 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {CameraConfig, configSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
-import {SimpleConfigService} from "@/config/simple-config.service";
+import {configSchema} from "@/config/config-zod-schema";
+import {FileConfigReader} from "@/config/file-config-reader.service";
 import prompts from 'prompts';
 import {promises as fs} from "fs";
 
 @Injectable()
-export class ReaderConfigService extends SimpleConfigService {
+export class PromptConfigReader extends FileConfigReader {
 
   constructor(
     logger: Logger,
@@ -51,67 +51,77 @@ export class ReaderConfigService extends SimpleConfigService {
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
       
-      // Check if it's a Zod object by checking if it has a 'shape' property
-      const isZodObject = zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined;
-      
-      if (isZodObject) {
+      if (zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined) {
         // Nested object - recurse with the nested schema
         this.addQuestions(prefix, zodField, questions, currentPath);
       } else {
-        // Primitive field
-        let type = 'text';
-        
-        // Check the actual type by looking at the inner structure
-        let innerType = zodField;
-        
-        // Unwrap ZodDefault if present (type: "default")
-        if (innerType._def.type === 'default') {
-          innerType = innerType._def.innerType;
-        }
-        
-        // Unwrap ZodEffects if present (from .int(), .min(), etc.)
-        if (innerType._def.type === 'effect') {
-          innerType = innerType._def.schema;
-        }
-        
-        // Now check the actual underlying type using .type property
-        if (innerType._def.type === 'number') {
-          type = 'number';
-        } else if (innerType._def.type === 'boolean') {
-          type = 'confirm';
-        }
-        
-        const description = zodField._def.description || fieldName;
-        
-        // Get default value from Zod schema - handle ZodDefault properly
-        let defaultValue;
-        if (zodField._def.type === 'default') {
-          try {
-            defaultValue = zodField._def.defaultValue;
-          } catch {
-            defaultValue = undefined;
-          }
-        } else {
-          defaultValue = undefined;
-        }
-        
-        const question: any = {
-          type,
-          name: fieldName, // Use dot notation for field names
-          message: description,
-          initial: defaultValue
-        };
-        
-        // Add validation using Zod
-        question.validate = (value: any) => {
-          const result = zodField.safeParse(value);
-          if (result.success) return true;
-          return result.error.issues[0]?.message || 'Invalid value';
-        };
-        
+        // Primitive field - create question
+        const question = this.createQuestion(fieldName, zodField);
         questions.push(question);
       }
     }
+  }
+
+  private createQuestion(fieldName: string, zodField: any): any {
+    const type = this.detectFieldType(zodField);
+    const description = zodField._def.description || fieldName;
+    const defaultValue = this.getDefaultValue(zodField);
+    
+    const question: any = {
+      type,
+      name: fieldName,
+      message: description,
+      initial: defaultValue
+    };
+    
+    // Add validation using Zod
+    question.validate = (value: any) => {
+      const result = zodField.safeParse(value);
+      if (result.success) return true;
+      return result.error.issues[0]?.message || 'Invalid value';
+    };
+    
+    return question;
+  }
+
+  private detectFieldType(zodField: any): string {
+    let type = 'text';
+    const innerType = this.unwrapZodField(zodField);
+    
+    if (innerType._def.type === 'number') {
+      type = 'number';
+    } else if (innerType._def.type === 'boolean') {
+      type = 'confirm';
+    }
+    
+    return type;
+  }
+
+  private unwrapZodField(zodField: any): any {
+    let innerType = zodField;
+    
+    // Unwrap ZodDefault if present (type: "default")
+    if (innerType._def.type === 'default') {
+      innerType = innerType._def.innerType;
+    }
+    
+    // Unwrap ZodEffects if present (from .int(), .min(), etc.)
+    if (innerType._def.type === 'effect') {
+      innerType = innerType._def.schema;
+    }
+    
+    return innerType;
+  }
+
+  private getDefaultValue(zodField: any): any {
+    if (zodField._def.type === 'default') {
+      try {
+        return zodField._def.defaultValue;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
   }
 
   private setNestedValue(obj: any, path: string[], value: any): void {
@@ -133,17 +143,5 @@ export class ReaderConfigService extends SimpleConfigService {
       const path = fieldName.split('.'); // Split "telegram.token" -> ["telegram", "token"]
       this.setNestedValue(this.data, path, value);
     }
-  }
-
-  public getTGConfig(): TelegramConfig {
-    return this.data.telegram;
-  }
-
-  public getDiffConfig(): DiffConfig {
-    return this.data.diff;
-  }
-
-  public getCameraConfig(): CameraConfig {
-    return this.data.camera;
   }
 }

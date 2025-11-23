@@ -5,7 +5,7 @@ import path from "path";
 import {CameraConfig, Config, configSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
-export class SimpleConfigService implements IConfigResolver{
+export class FileConfigReader implements IConfigResolver{
   protected data: Config = null!;
   constructor(
     protected readonly logger: Logger,

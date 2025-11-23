@@ -1,8 +1,8 @@
 import {Logger, Module} from '@nestjs/common';
 import {CameraConfData, DiffConfData, IConfigResolver, TelegramConfigData} from "@/config/config-resolve-model";
-import {SimpleConfigService} from "@/config/simple-config.service";
+import {FileConfigReader} from "@/config/file-config-reader.service";
 import {isSea} from "node:sea";
-import {ReaderConfigService} from "@/config/reader-config.service";
+import {PromptConfigReader} from "@/config/promt-config-reader.service";
 
 
 @Module({
@@ -10,10 +10,10 @@ import {ReaderConfigService} from "@/config/reader-config.service";
   providers: [
     Logger,
     {
-      provide: SimpleConfigService,
+      provide: FileConfigReader,
       inject: [Logger],
-      useFactory: async (logger: Logger): Promise<SimpleConfigService> => {
-        const data = new ReaderConfigService(logger, isSea() ? __dirname : process.cwd());
+      useFactory: async (logger: Logger): Promise<FileConfigReader> => {
+        const data = new PromptConfigReader(logger, isSea() ? __dirname : process.cwd());
         await data.load()
         return data;
       },
@@ -21,17 +21,17 @@ import {ReaderConfigService} from "@/config/reader-config.service";
     {
       provide: DiffConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
-      inject: [SimpleConfigService],
+      inject: [FileConfigReader],
     },
     {
       provide: CameraConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getCameraConfig(),
-      inject: [SimpleConfigService],
+      inject: [FileConfigReader],
     },
     {
       provide: TelegramConfigData,
       useFactory: (resolver: IConfigResolver) => resolver.getTGConfig(),
-      inject: [SimpleConfigService],
+      inject: [FileConfigReader],
     }
   ],
 })
