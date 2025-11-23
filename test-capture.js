@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const bindings = require('bindings');
 
-const deviceName = process.argv[2] || 'OBS Virtual Camera';
+const deviceName = process.argv[2] || '/dev/video0';
 const fps = Number(process.argv[3] || 1);
 const durationSeconds = Number(process.argv[4] || 5);
 
