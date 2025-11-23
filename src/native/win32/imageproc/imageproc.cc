@@ -1,4 +1,5 @@
 #include "imageproc.h"
+#include "../../shared/imageproc/imageproc.h"
 #include "toojpeg.h"
 #include "toojpeg.cpp"
 #include <algorithm>
