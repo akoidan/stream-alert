@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { PromptConfigReader } from './promt-config-reader.service';
 import { aconfigSchema } from './config-zod-schema';
 import prompts from 'prompts';
+import {FieldsValidator} from "@/config/fields-validator";
 
 // Mock the prompts module
 jest.mock('prompts');
@@ -21,7 +22,7 @@ describe('ReaderConfigService', () => {
     } as any;
 
     // Create service instance directly with test dependencies
-    service = new PromptConfigReader(mockLogger, '/test/configs');
+    // service = new PromptConfigReader(mockLogger, '/test/configs', new FieldsValidator());
   });
 
   afterEach(() => {
