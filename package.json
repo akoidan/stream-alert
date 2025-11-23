@@ -5,11 +5,11 @@
   "license": "MIT",
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register src/main.ts",
-    "start:debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
+    "debug": "node  --inspect -r tsconfig-paths/register -r ts-node/register src/main.ts",
     "types": "node-ts-config",
     "cmake": "cmake-js build --debug",
     "nest": "nest build",
-    "build": "npm-run-all -s nest esbuild native",
+    "build": "npm-run-all -s cmake nest esbuild native",
     "esbuild": "node esbuild.config.js",
     "native": "node --experimental-sea-config sea-config.json && node scripts/sea-postject.js"
   },
