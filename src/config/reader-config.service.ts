@@ -33,25 +33,29 @@ export class ReaderConfigService extends SimpleConfigService {
     const questions = this.createQuestionsFromSchema();
     const responses = await prompts(questions);
     
-    // Update the data with responses
-    this.updateDataFromResponses(responses);
+    // Update the data with responses using recursive mapping
+    this.updateDataFromResponsesRecursive(responses);
   }
 
   private createQuestionsFromSchema() {
     const questions: any[] = [];
     const self = this;
     
-    // Helper function to add questions for nested objects
-    function addQuestions(prefix: string, schema: any, currentData: any) {
+    // Get default values from Zod schema
+    const defaultData = configSchema.parse({});
+    
+    // Helper function to recursively add questions
+    function addQuestions(prefix: string, schema: any, currentData: any, path: string[] = []) {
       const shape = schema.shape;
       
       for (const [key, fieldSchema] of Object.entries(shape)) {
         const zodField = fieldSchema as any;
-        const fieldName = prefix ? prefix + key.charAt(0).toUpperCase() + key.slice(1) : key;
+        const currentPath = [...path, key];
+        const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
         
         if (zodField._def.typeName === 'ZodObject') {
           // Nested object - recurse
-          addQuestions(key, zodField, currentData[key] || {});
+          addQuestions(prefix, zodField, currentData[key] || {}, currentPath);
         } else {
           // Primitive field
           let type = 'text';
@@ -62,9 +66,9 @@ export class ReaderConfigService extends SimpleConfigService {
           
           const question: any = {
             type,
-            name: fieldName,
+            name: fieldName, // Use dot notation for field names
             message: description,
-            initial: self.getInitial(currentData[key])
+            initial: self.getInitial(self.getNestedValue(currentData, currentPath))
           };
           
           // Add validation using Zod
@@ -79,48 +83,35 @@ export class ReaderConfigService extends SimpleConfigService {
       }
     }
     
-    // Initialize with default values from config schema
-    const defaultData = {
-      telegram: { token: '@@TG_TOKEN', chatId: '@@TG_CHAT_ID', spamDelay: 300, initialDelay: 10, message: 'Changes detected' },
-      camera: { name: 'OBS Virtual Camera', frameRate: 1 },
-      diff: { pixels: 1000, threshold: 0.0 }
-    };
-    
     addQuestions('', configSchema, defaultData);
     return questions;
+  }
+
+  private getNestedValue(obj: any, path: string[]): any {
+    return path.reduce((current, key) => current?.[key], obj);
+  }
+
+  private setNestedValue(obj: any, path: string[], value: any): void {
+    const lastKey = path.pop()!;
+    const target = path.reduce((current, key) => {
+      if (!current[key]) current[key] = {};
+      return current[key];
+    }, obj);
+    target[lastKey] = value;
   }
 
   private getInitial<T>(value: T): T | undefined {
     return typeof value === 'string' && value.startsWith('@@') ? undefined : value;
   }
 
-  private updateDataFromResponses(responses: any) {
-    // Initialize data structure if not exists
-    if (!this.data) {
-      this.data = {
-        telegram: { token: '', chatId: 0, spamDelay: 300, initialDelay: 10, message: '' },
-        camera: { name: '', frameRate: 1 },
-        diff: { pixels: 1000, threshold: 0.0 }
-      };
-    }
-
-    for (const [key, value] of Object.entries(responses)) {
-      if (key.startsWith('telegram')) {
-        const telegramKey = key.replace('telegram', '').toLowerCase();
-        if (telegramKey && telegramKey !== 'telegram') {
-          (this.data.telegram as any)[telegramKey] = value;
-        }
-      } else if (key.startsWith('camera')) {
-        const cameraKey = key.replace('camera', '').toLowerCase();
-        if (cameraKey && cameraKey !== 'camera') {
-          (this.data.camera as any)[cameraKey] = value;
-        }
-      } else if (key.startsWith('diff')) {
-        const diffKey = key.replace('diff', '').toLowerCase();
-        if (diffKey && diffKey !== 'diff') {
-          (this.data.diff as any)[diffKey] = value;
-        }
-      }
+  private updateDataFromResponsesRecursive(responses: any) {
+    // Initialize data with defaults from Zod schema
+    this.data = configSchema.parse({});
+    
+    // Update with user responses
+    for (const [fieldName, value] of Object.entries(responses)) {
+      const path = fieldName.split('.'); // Split "telegram.token" -> ["telegram", "token"]
+      this.setNestedValue(this.data, path, value);
     }
   }
 
