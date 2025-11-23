@@ -3,7 +3,7 @@ import {z} from 'zod';
 // Zod Schemas based on Config.d.ts, default.json, and validation rules from sea.ts
 export const telegramSchema = z.object({
   token: z.string()
-    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz)')
+    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
     .describe('🔑 Bot token from @BotFather - required for Telegram bot authentication'),
   chatId: z.number()
     .int()
