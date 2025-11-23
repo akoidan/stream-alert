@@ -564,10 +564,28 @@ namespace Capture {
     static std::atomic<bool> g_isCapturing{false};
     static Napi::ThreadSafeFunction g_callbackFunction;
 
+    Napi::Value ListAvailableCameras(const Napi::CallbackInfo& info) {
+        Napi::Env env = info.Env();
+
+        auto cameras = GetAvailableCameras();
+        Napi::Array result = Napi::Array::New(env, cameras.size());
+
+        uint32_t index = 0;
+        for (const auto& entry : cameras) {
+            Napi::Object camera = Napi::Object::New(env);
+            camera.Set("name", Napi::String::New(env, entry.first));
+            camera.Set("path", Napi::String::New(env, entry.second));
+            result.Set(index++, camera);
+        }
+
+        return result;
+    }
+
     Napi::Object Init(Napi::Env env, Napi::Object exports) {
         exports.Set(Napi::String::New(env, "start"), Napi::Function::New(env, Capture::Start));
         exports.Set(Napi::String::New(env, "stop"), Napi::Function::New(env, Capture::Stop));
         exports.Set(Napi::String::New(env, "getFrame"), Napi::Function::New(env, Capture::GetFrame));
+        exports.Set(Napi::String::New(env, "listAvailableCameras"), Napi::Function::New(env, Capture::ListAvailableCameras));
         return exports;
     }
 

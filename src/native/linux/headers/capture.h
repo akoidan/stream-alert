@@ -59,4 +59,5 @@ namespace Capture {
     Napi::Value Start(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetFrame(const Napi::CallbackInfo& info);
+    Napi::Value ListAvailableCameras(const Napi::CallbackInfo& info);
 }
