@@ -17,7 +17,8 @@ esbuild.build({
     'string_decoder', 'timers', 'trace_events', 'tty', 'v8', 'vm', 'wasi', 'worker_threads',
     // Externalize optional NestJS packages
     '@nestjs/websockets', '@nestjs/microservices', '@nestjs/websockets/socket-module',
-    '@nestjs/microservices/microservices-module', 'class-validator', 'class-transformer'
+    '@nestjs/microservices/microservices-module', 'class-validator', 'class-transformer',
+    '@nestjs/platform-express',
   ],
   plugins: [
     {
