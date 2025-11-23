@@ -10,10 +10,10 @@ Get a Telegram notification when your webcam or screen changes on Windows OS.
 
 ## Setup Requirements
 
-### Telegram Bot
-- You'll need a Telegram bot to receive notifications
-- The app will guide you through creating one with `@BotFather`
-- You'll also get your chat ID from `@userinfobot`
+You need 
+- windows os
+- webcamera
+- [telegram](https://telegram.org/)
 
 ### Camera Options
 - **Webcam**: Use your physical webcam
@@ -33,8 +33,8 @@ The app monitors your camera feed and sends Telegram alerts when:
 ## Configuration
 
 When you first run the app, you'll be asked to configure:
-- **Bot Token**: Get this from @BotFather
-- **Chat ID**: Get this from @userinfobot  
+- **Bot Token**: Get this from telegram bot `@BotFather`
+- **Chat ID**: Get this from telegram bot `@userinfobot`  
 - **Alert Delay**: Minimum time between alerts (10+ seconds recommended)
 - **Alert Message**: Custom message for notifications
 - **Camera**: You can get the name e.g. -> https://meet.google.com/ and create an instant call ->  Settings > Video and check the camera list
