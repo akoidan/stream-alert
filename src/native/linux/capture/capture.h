@@ -6,7 +6,7 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
-#include "../../shared/common/common.h"
+#include "common.h"
 
 // Forward declarations
 struct v4l2_format;
@@ -55,6 +55,7 @@ private:
 
 // N-API functions
 namespace Capture {
+    Napi::Object Init(Napi::Env env, Napi::Object exports);
     Napi::Value Start(const Napi::CallbackInfo& info);
     Napi::Value Stop(const Napi::CallbackInfo& info);
     Napi::Value GetFrame(const Napi::CallbackInfo& info);

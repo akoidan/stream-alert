@@ -1,4 +1,4 @@
-#include "headers/capture_device.h"
+#include "capture_device.h"
 
 IPin* FindPinByDirection(IBaseFilter* filter, PIN_DIRECTION direction) {
     if (!filter) {

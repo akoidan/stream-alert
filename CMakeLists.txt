@@ -43,10 +43,13 @@ elseif(UNIX AND NOT APPLE)
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
     
     # Source files
-    file(GLOB_RECURSE LINUX_CAPTURE_SOURCES "${CMAKE_SOURCE_DIR}/src/native/linux/**.cc")
-    file(GLOB_RECURSE SHARED_IMAGEPROC_SOURCES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
+    file(GLOB_RECURSE HEADERS "${CMAKE_SOURCE_DIR}/src/native/linux/**.h")
+    file(GLOB_RECURSE SHARED_HEADERS "${CMAKE_SOURCE_DIR}/src/native/shared/**.h")
+    file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/**.cc")
+    file(GLOB_RECURSE CC_SHARED_FILES "${CMAKE_SOURCE_DIR}/src/native/shared/**.cc")
+
     set(LINUX_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src/native/linux/main.cc")
-    set(SOURCE_FILES ${LINUX_CAPTURE_SOURCES} ${SHARED_IMAGEPROC_SOURCES} ${LINUX_MAIN_SOURCE})
+    set(SOURCE_FILES ${HEADERS} ${SHARED_HEADERS} ${CC_FILES} ${CC_SHARED_FILES})
     
     add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
     set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")

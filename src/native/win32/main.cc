@@ -1,5 +1,5 @@
 #include <napi.h>
-#include "./capture/headers/capture.h"
+#include "../../shared/capture/headers/capture.h"
 #include "./imageproc/headers/imageproc.h"
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {

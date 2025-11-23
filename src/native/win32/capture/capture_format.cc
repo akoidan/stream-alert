@@ -1,5 +1,5 @@
-#include "headers/capture_format.h"
-#include "headers/capture_media.h"
+#include "capture_format.h"
+#include "capture_media.h"
 #include "../logger.h"
 
 #include <iostream>

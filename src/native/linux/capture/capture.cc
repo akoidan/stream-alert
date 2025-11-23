@@ -1,5 +1,5 @@
 #include "capture.h"
-#include "../../shared/common/common.h"
+#include "common.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -563,6 +563,13 @@ namespace Capture {
     static std::thread g_captureThread;
     static std::atomic<bool> g_isCapturing{false};
     static Napi::ThreadSafeFunction g_callbackFunction;
+
+    Napi::Object Init(Napi::Env env, Napi::Object exports) {
+        exports.Set(Napi::String::New(env, "start"), Napi::Function::New(env, Capture::Start));
+        exports.Set(Napi::String::New(env, "stop"), Napi::Function::New(env, Capture::Stop));
+        exports.Set(Napi::String::New(env, "getFrame"), Napi::Function::New(env, Capture::GetFrame));
+        return exports;
+    }
 
     Napi::Value Start(const Napi::CallbackInfo& info) {
         Napi::Env env = info.Env();
