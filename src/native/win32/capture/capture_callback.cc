@@ -1,6 +1,6 @@
-#include "headers/capture_callback.h"
-#include "headers/capture_media.h"
-#include "../logger.h"
+#include "capture_callback.h"
+#include "capture_media.h"
+#include "logger.h"
 
 #include <iostream>
 #include <memory>

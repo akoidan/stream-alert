@@ -2,7 +2,6 @@
 
 #include <napi.h>
 #include <vector>
-#include <memory>
 
 struct SimpleImage {
     int width;
@@ -12,10 +11,7 @@ struct SimpleImage {
 };
 
 namespace ImageProc {
-    // High-Performance RGB Functions
     Napi::Value ConvertRgbToJpeg(const Napi::CallbackInfo& info);
     Napi::Value CompareRgbImages(const Napi::CallbackInfo& info);
-    
-    // Initialize image processor module
     Napi::Object Init(Napi::Env env, Napi::Object exports);
 }

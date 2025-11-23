@@ -10,35 +10,47 @@ on:
         required: true
 
 jobs:
-  build_and_release:
-    runs-on: windows-2022
-    permissions: write-all
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 24
+  create_release:
+    runs-on: ubuntu-22.04
 
+    permissions: write-all
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
       - name: Set Short SHA
-        run: echo "SHORT_SHA=$($env:GITHUB_SHA.Substring(0,7))" | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Set Release Name from Input
         if: github.event_name == 'workflow_dispatch'
-        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" >> $GITHUB_ENV
 
       - name: Set Release Name for Push Trigger
         if: github.event_name == 'push'
-        run: echo "RELEASE_NAME=$env:SHORT_SHA" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Cache node_modules cache
-        id: cache-node
-        uses: actions/cache@v4
+        run: echo "RELEASE_NAME=${{ env.SHORT_SHA }}" >> $GITHUB_ENV
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+          tag_name: ${{ env.RELEASE_NAME }}
+          release_name: ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
+
+  linux:
+    runs-on: ubuntu-22.04
+    needs: [ create_release ]
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: yarn
 
       - name: Install yarn deps
-        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules
@@ -53,12 +65,50 @@ jobs:
       - name: Create a windows executable
         run: yarn native
 
-      - name: Create GitHub Release and Upload Asset
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create $env:RELEASE_NAME `
-            ./dist/stream-alert.exe#app.exe `
-            --title $env:RELEASE_NAME `
-            --notes "Release $env:RELEASE_NAME"
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./dist/stream-alert.exe
+          asset_name: app.elf
+          asset_content_type: application/x-executable
 
+
+  win32:
+    needs: [ create_release ]
+    runs-on: windows-2022
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install yarn deps
+        run: yarn install --frozen-lockfile
+
+      - name: Build native .node modules
+        run: yarn cmake
+
+      - name: Compile typescript nestjs project
+        run: yarn nest
+
+      - name: Bundle everything to a single file
+        run: yarn esbuild
+
+      - name: Create a windows executable
+        run: yarn native
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./dist/stream-alert.exe
+          asset_name: app.exe
+          asset_content_type: application/vnd.microsoft.portable-executable

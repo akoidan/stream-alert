@@ -1,5 +1,5 @@
-#include "headers/capture_state.h"
-#include "../logger.h"
+#include "capture_state.h"
+#include "logger.h"
 #include <Windows.h>
 #include <iostream>
 

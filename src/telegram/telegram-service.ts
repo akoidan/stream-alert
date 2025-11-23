@@ -8,7 +8,8 @@ import {TelegramConfig} from "@/config/config-zod-schema";
 
 @Injectable()
 export class TelegramService {
-  private lastNotificationTime: number;
+  private lastNotificationTime: number = 0;
+  private readonly created: number;
 
   constructor(
     private readonly logger: Logger,
@@ -17,7 +18,7 @@ export class TelegramService {
     private readonly tgConfig: TelegramConfig,
   ) {
     // Set last notification time to 3 seconds ago to allow for initial setup
-    this.lastNotificationTime = Date.now() - (this.tgConfig.spamDelay - this.tgConfig.initialDelay) * 1000
+    this.created = Date.now();
   }
 
   async setup(commandListener: TgCommandsExecutor): Promise<void> {
@@ -64,12 +65,16 @@ export class TelegramService {
   async sendImage(data: Buffer): Promise<void> {
     const newNotificationTime = Date.now();
     const diffDate = newNotificationTime - this.lastNotificationTime;
-    if (diffDate > this.tgConfig.spamDelay * 1000) {
-      await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
-      this.lastNotificationTime = newNotificationTime;
-      this.logger.log("Notification sent");
-    } else {
-      this.logger.log(`Skipping sending notification as the last one was sent ${diffDate}ms ago`);
+    if (this.lastNotificationTime === 0 && newNotificationTime - this.created < this.tgConfig.initialDelay * 1000) {
+      this.logger.log(`Awaiting startup delay ${this.tgConfig.initialDelay}s before sending notification`);
+      return;
     }
+    if (this.lastNotificationTime !== 0 && diffDate < this.tgConfig.spamDelay * 1000) {
+      this.logger.log(`Awaiting ${this.tgConfig.spamDelay}s before next notificaiton. ${Math.round(diffDate/ 1000)}s passed`);
+      return
+    }
+    await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
+    this.lastNotificationTime = newNotificationTime;
+    this.logger.log("Notification sent");
   }
 }

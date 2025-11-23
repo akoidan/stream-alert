@@ -1,10 +1,10 @@
-#include "headers/capture.h"
-#include "headers/capture_state.h"
-#include "headers/capture_media.h"
-#include "headers/capture_device.h"
-#include "headers/capture_callback.h"
-#include "headers/capture_format.h"
-#include "../logger.h"
+#include "capture.h"
+#include "capture_state.h"
+#include "capture_media.h"
+#include "capture_device.h"
+#include "capture_callback.h"
+#include "capture_format.h"
+#include "logger.h"
 
 #include <chrono>
 #include <iostream>
