@@ -51,22 +51,57 @@ export class ReaderConfigService extends SimpleConfigService {
         const currentPath = [...path, key];
         const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
         
-        if (zodField._def.typeName === 'ZodObject') {
-          // Nested object - recurse
-          addQuestions(prefix, zodField, currentData[key] || {}, currentPath);
+        // Check if it's a Zod object by checking if it has a 'shape' property
+        const isZodObject = zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined;
+        
+        if (isZodObject) {
+          // Nested object - recurse with the nested schema and its defaults
+          const nestedDefaults = zodField._def.defaultValue?.() || {};
+          addQuestions(prefix, zodField, nestedDefaults, currentPath);
         } else {
           // Primitive field
           let type = 'text';
-          if (zodField._def.typeName === 'ZodNumber') type = 'number';
-          else if (zodField._def.typeName === 'ZodBoolean') type = 'confirm';
+          
+          // Check the actual type by looking at the inner structure
+          let innerType = zodField;
+          
+          // Unwrap ZodDefault if present (type: "default")
+          if (innerType._def.type === 'default') {
+            innerType = innerType._def.innerType;
+          }
+          
+          // Unwrap ZodEffects if present (from .int(), .min(), etc.)
+          if (innerType._def.type === 'effect') {
+            innerType = innerType._def.schema;
+          }
+          
+          // Now check the actual underlying type using .type property
+          if (innerType._def.type === 'number') {
+            type = 'number';
+          } else if (innerType._def.type === 'boolean') {
+            type = 'confirm';
+          }
           
           const description = zodField._def.description || fieldName;
+          
+          // Get default value from Zod schema - handle ZodDefault properly
+          let defaultValue;
+          if (zodField._def.type === 'default') {
+            try {
+              defaultValue = zodField._def.defaultValue;
+            } catch {
+              defaultValue = undefined;
+            }
+          } else {
+            defaultValue = undefined;
+          }
+          const initialValue = self.getInitial(defaultValue);
           
           const question: any = {
             type,
             name: fieldName, // Use dot notation for field names
             message: description,
-            initial: self.getInitial(self.getNestedValue(currentData, currentPath))
+            initial: initialValue
           };
           
           // Add validation using Zod
@@ -81,7 +116,7 @@ export class ReaderConfigService extends SimpleConfigService {
       }
     }
     
-    addQuestions('', configSchema, defaultData);
+    addQuestions('', configSchema, {});
     return questions;
   }
 
@@ -99,12 +134,29 @@ export class ReaderConfigService extends SimpleConfigService {
   }
 
   private getInitial<T>(value: T): T | undefined {
-    return typeof value === 'string' && value.startsWith('@@') ? undefined : value;
-  }
+  // Return the value as-is, no @@ filtering needed since we use Zod defaults
+  return value;
+}
 
   private updateDataFromResponsesRecursive(responses: any) {
-    // Initialize data with defaults from Zod schema
-    this.data = configSchema.parse({});
+    // Initialize data with defaults from Zod schema - provide valid defaults that pass validation
+    this.data = configSchema.parse({
+      telegram: {
+        token: '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789', // Valid token format (10 digits : 35 chars)
+        chatId: 123456789, // Valid chat ID (> 10000)
+        spamDelay: 300,
+        message: 'Changes detected',
+        initialDelay: 10
+      },
+      camera: {
+        name: 'OBS Virtual Camera',
+        frameRate: 1
+      },
+      diff: {
+        pixels: 1000,
+        threshold: 0.1
+      }
+    });
     
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {
