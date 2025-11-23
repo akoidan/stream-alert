@@ -18,9 +18,14 @@ export class FileConfigReader implements IConfigResolver{
     return path.join(this.configsPath, 'stream-alert.json');
   };
 
-  public async load() {
-    const data = await fs.readFile(this.confPath, 'utf8');
-    this.data = await aconfigSchema.parseAsync(JSON.parse(data));
+  public async load(): Promise<boolean> {
+    if (await fs.access(this.confPath).then(() => true).catch(() => false)) {
+      const data = await fs.readFile(this.confPath, 'utf8');
+      this.data = await aconfigSchema.parseAsync(JSON.parse(data));
+      return true;
+    } else {
+      return false
+    }
   }
 
   public getTGConfig(): TelegramConfig {

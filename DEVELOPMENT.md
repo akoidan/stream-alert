@@ -19,9 +19,6 @@ You need either a real physical webcam or a virtual webcam.
 
 #### Physical Webcam
 For a real physical webcam, specify its name in `stream-alert.json` at path `camera.name`.
-You can get the camera name from any software that reads cameras. For example:
-1. Join https://meet.google.com/ and create an instant call
-2. Go to Settings > Video and check the camera list
 
 #### OBS Virtual Camera
 For screen capture, you need OBS with virtual camera feature:

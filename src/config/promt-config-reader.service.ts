@@ -16,15 +16,12 @@ export class PromptConfigReader extends FileConfigReader {
     super(logger, configsPath)
   }
 
-  public async load() {
-    try {
-      await super.load()
-    } catch (e) {
-      this.logger.warn(`Can't parse config file at ${this.confPath}`);
-      
-      // Initialize with default values and prompt user for configuration
+  public async load(): Promise<boolean> {
+    const success = await super.load()
+    if (!success) {
       await this.promptForConfiguration();
     }
+    return true;
   }
 
   private async promptForConfiguration() {
@@ -38,7 +35,7 @@ export class PromptConfigReader extends FileConfigReader {
     this.addQuestions('', aconfigSchema, questions);
 
     const responses = await prompts(questions);
-    
+
     // Update the data with responses using recursive mapping
     this.updateDataFromResponsesRecursive(responses);
     this.logger.log(`Saving data to file ${this.confPath}`)
@@ -47,12 +44,12 @@ export class PromptConfigReader extends FileConfigReader {
 
   private addQuestions(prefix: string, schema: any, questions: any[], path: string[] = []): void {
     const shape = schema.shape;
-    
+
     for (const [key, fieldSchema] of Object.entries(shape)) {
       const zodField = fieldSchema as any;
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
-      
+
       if (zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined) {
         // Nested object - recurse with the nested schema
         this.addQuestions(prefix, zodField, questions, currentPath);
@@ -68,7 +65,7 @@ export class PromptConfigReader extends FileConfigReader {
     const type = this.detectFieldType(zodField);
     const description = zodField._def.description || fieldName;
     const defaultValue = this.getDefaultValue(zodField);
-    
+
     const question: any = {
       type,
       name: fieldName,
@@ -92,36 +89,36 @@ export class PromptConfigReader extends FileConfigReader {
       }
       return result.error?.issues[0]?.message || 'Invalid value';
     };
-    
+
     return question;
   }
 
   private detectFieldType(zodField: any): string {
     let type = 'text';
     const innerType = this.unwrapZodField(zodField);
-    
+
     if (innerType._def.type === 'number') {
       type = 'number';
     } else if (innerType._def.type === 'boolean') {
       type = 'confirm';
     }
-    
+
     return type;
   }
 
   private unwrapZodField(zodField: any): any {
     let innerType = zodField;
-    
+
     // Unwrap ZodDefault if present (type: "default")
     if (innerType._def.type === 'default') {
       innerType = innerType._def.innerType;
     }
-    
+
     // Unwrap ZodEffects if present (from .int(), .min(), etc.)
     if (innerType._def.type === 'effect') {
       innerType = innerType._def.schema;
     }
-    
+
     return innerType;
   }
 
@@ -149,7 +146,7 @@ export class PromptConfigReader extends FileConfigReader {
   private updateDataFromResponsesRecursive(responses: any) {
     // Start with empty object
     this.data = {} as any;
-    
+
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {
       const path = fieldName.split('.'); // Split "telegram.token" -> ["telegram", "token"]

@@ -6,7 +6,7 @@ export const TelegramConfigData = 'TelegramConfig';
 export const DiffConfData = 'DiffConf'
 
 export interface IConfigResolver {
-  load(): Promise<void>;
+  load(): Promise<boolean>;
   getTGConfig(): TelegramConfig;
   getDiffConfig(): DiffConfig;
   getCameraConfig(): CameraConfig;
