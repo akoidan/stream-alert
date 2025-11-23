@@ -12,17 +12,14 @@ export const telegramSchema = z.object({
   spamDelay: z.number()
     .nonnegative('Delay must be non-negative')
     .describe('⏱️ Delay between alerts in seconds - short delay will result in many notifications')
-    .default(300)
-    .optional(),
+    .default(300),
   message: z.string()
     .min(1, 'Message cannot be empty')
     .describe('📨 Alert message text sent when motion is detected')
-    .optional()
     .default('Changes detected'),
   initialDelay: z.number()
     .nonnegative('Initial delay must be non-negative')
     .describe('⏰ Initial delay before starting motion detection')
-    .optional()
     .default(10),
 });
 
@@ -30,11 +27,9 @@ export const cameraSchema = z.object({
   name: z.string()
     .min(1, 'Camera name cannot be empty')
     .describe('📹 Camera name (e.g., "OBS Virtual Camera" or your webcam)')
-    .optional()
     .default('OBS Virtual Camera'),
   frameRate: z.number()
     .positive('Frame rate must be positive')
-    .optional()
     .describe('🎬 Frame rate in frames per second (recommended: 1-5)')
     .default(1),
 });
@@ -43,12 +38,10 @@ export const diffSchema = z.object({
   pixels: z.number()
     .positive('Pixel count must be positive')
     .describe('🔍 Minimum changed pixels required to trigger an alert')
-    .optional()
     .default(1000),
   threshold: z.number()
     .min(0, 'Threshold must be at least 0.0')
     .max(1, 'Threshold must be at most 1.0')
-    .optional()
     .describe('🎯 Change sensitivity level, lower = more aggressive')
     .default(0.1),
 });

@@ -40,9 +40,7 @@ export class ReaderConfigService extends SimpleConfigService {
   private createQuestionsFromSchema() {
     const questions: any[] = [];
     const self = this;
-    
-    // Get default values from Zod schema
-    const defaultData = configSchema.parse({});
+
     
     // Helper function to recursively add questions
     function addQuestions(prefix: string, schema: any, currentData: any, path: string[] = []) {
