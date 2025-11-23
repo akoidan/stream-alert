@@ -20,15 +20,7 @@ class MockFieldsValidator {
   public async validateTgToken(value: any) {
     return true;
   }
-  
-  // Add synchronous versions for testing
-  public validateTgChatSync(value: any) {
-    return true;
-  }
-  
-  public validateTgTokenSync(value: any) {
-    return true;
-  }
+
 }
 
 describe('ReaderConfigService', () => {
