@@ -71,7 +71,7 @@ yarn start
 
 **Note**: Only 1 process can be running at the same time due to Telegram bot restrictions.
 
-## ?? Build Process
+## Build Process
 
 ### Build Windows Executable
 
