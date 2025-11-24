@@ -103,7 +103,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ./dist/stream-alert.exe
-          asset_name: app.elf
+          asset_name: stream-alert.elf
           asset_content_type: application/x-executable
 
   win32:
@@ -147,5 +147,5 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ./dist/stream-alert.exe
-          asset_name: app.exe
+          asset_name: stream-alert.exe
           asset_content_type: application/vnd.microsoft.portable-executable
