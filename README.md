@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/deathangel908/lines-logger/blob/master/LICENSE) [![Coverage](https://coveralls.io/repos/github/akoidan/stream-alert/badge.svg?branch=main)](https://coveralls.io/github/akoidan/stream-alert?branch=main) [![Build Status](https://github.com/akoidan/stream-alert/actions/workflows/build.yaml/badge.svg?branch=main)](https://github.com/akoidan/stream-alert/actions/workflows/build.yaml)
+
 # Stream Alert
 
 Get a Telegram notification when your webcam or screen changes
