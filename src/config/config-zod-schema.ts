@@ -3,7 +3,7 @@ import {z} from 'zod';
 // Zod Schemas based on Config.d.ts, default.json, and validation rules from sea.ts
 const telegramSchema = z.object({
   token: z.string()
-    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
+    .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/u, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
     .describe('🔑 Bot token from @BotFather'),
   chatId: z.number()
     .int()
@@ -57,5 +57,5 @@ type CameraConfig = z.infer<typeof cameraSchema>
 type DiffConfig = z.infer<typeof diffSchema>
 
 
-export {telegramSchema, cameraSchema, diffSchema, aconfigSchema}
+export {telegramSchema, cameraSchema, diffSchema, aconfigSchema};
 export type {Config, TelegramConfig, CameraConfig, DiffConfig};

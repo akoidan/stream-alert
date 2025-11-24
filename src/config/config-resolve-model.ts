@@ -22,5 +22,5 @@ const ConfigPath = 'ConfigPath';
 const ConfigData = 'ConfigData';
 
 
-export {CameraConfData, TelegramConfigData, DiffConfData, TelegrafGet, Platform, ConfigPath, ConfigData}
-export type {IConfigResolver}
+export {CameraConfData, TelegramConfigData, DiffConfData, TelegrafGet, Platform, ConfigPath, ConfigData};
+export type {IConfigResolver};

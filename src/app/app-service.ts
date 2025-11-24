@@ -55,7 +55,7 @@ export class AppService implements GlobalService {
   }
 
   async run(): Promise<void> {
-    await this.ss.listen(this);
+    this.ss.listen(this);
     await this.telegram.setup(this);
   }
 }

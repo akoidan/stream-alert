@@ -112,6 +112,7 @@
     "import/max-dependencies": 0,
     "import/newline-after-import": 1,
     "import/no-absolute-path":1,
+    "no-underscore-dangle": 0,
     "import/no-amd": 1,
     "no-param-reassign": 0,
     "no-undefined": 0,

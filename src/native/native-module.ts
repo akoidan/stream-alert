@@ -19,11 +19,13 @@ import {createRequire} from 'node:module';
           const pathOnDisk = join(tmp, 'native.node');
           writeFileSync(pathOnDisk, Buffer.from(getAsset('native')));
           const requireFromHere = createRequire(__filename);
-          return requireFromHere(pathOnDisk);
+          // eslint-disable-next-line
+          return requireFromHere(pathOnDisk) as INativeModule;
         }
-        // do not require in on production app
-        const bindings = require('bindings');
-        return bindings('native');
+        // eslint-disable-next-line
+        const bindings = require('bindings') as any;
+        // eslint-disable-next-line
+        return bindings('native') as INativeModule;
       },
     },
   ],
@@ -37,7 +39,7 @@ export class NativeModule implements OnModuleInit {
   ) {
   }
 
-  onModuleInit(): any {
+  onModuleInit(): void {
     this.logger.log(`Loaded native library from ${clc.bold.green(this.native.path)}`);
   }
 }

@@ -25,7 +25,7 @@ import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-
     PromptConfigReader,
     {
       provide: TelegrafGet,
-      useValue: (s: string) => new Telegraf(s),
+      useValue: (s: string): Telegraf => new Telegraf(s),
     },
     {
       provide: Platform,
@@ -43,7 +43,7 @@ import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-
           await fr.load();
         } else {
           const data = await cr.load();
-          await fr.save(data);
+          fr.save(data);
         }
         return fr.data;
       },
