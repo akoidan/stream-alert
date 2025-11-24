@@ -1,15 +1,14 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {TelegramService} from "@/telegram/telegram-service";
-import {ImagelibService} from "@/imagelib/imagelib-service";
-import {StreamService} from "@/stream/stream-service";
-import type {GlobalService} from "@/app/app-model";
-import {CommandContextExtn} from "telegraf/typings/telegram-types";
-import {TelegramCommands} from "@/telegram/telegram-model";
-import {FrameData} from "@/native/native-model";
+import {TelegramService} from '@/telegram/telegram-service';
+import {ImagelibService} from '@/imagelib/imagelib-service';
+import {StreamService} from '@/stream/stream-service';
+import type {GlobalService} from '@/app/app-model';
+import {CommandContextExtn} from 'telegraf/typings/telegram-types';
+import {TelegramCommands} from '@/telegram/telegram-model';
+import {FrameData} from '@/native/native-model';
 
 @Injectable()
 export class AppService implements GlobalService {
-
   constructor(
     private readonly logger: Logger,
     private readonly ss: StreamService,
@@ -29,18 +28,18 @@ export class AppService implements GlobalService {
   }
 
   async onAskImage(): Promise<void> {
-    this.logger.log(`Got image command`);
+    this.logger.log('Got image command');
     const image = await this.im.getLastImage();
     if (image) {
       await this.telegram.sendImage(image);
     } else {
-      await this.telegram.sendText(`No image in cache`);
-      this.logger.log(`No current image found, skipping`);
+      await this.telegram.sendText('No image in cache');
+      this.logger.log('No current image found, skipping');
     }
   }
 
   async onSetThreshold(a: CommandContextExtn): Promise<void> {
-    const newThreshold = Number(a.payload)
+    const newThreshold = Number(a.payload);
     if (newThreshold > 0) {
       this.im.conf.threshold = newThreshold;
     } else {
@@ -48,7 +47,7 @@ export class AppService implements GlobalService {
     }
   }
 
-  public async onNewFrame(frameData: FrameData) {
+  public async onNewFrame(frameData: FrameData): Promise<void> {
     const image = await this.im.getImageIfItsChanged(frameData);
     if (image) {
       await this.telegram.sendImage(image);

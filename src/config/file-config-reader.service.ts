@@ -1,12 +1,11 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
-import {promises as fs} from "fs";
-import path from "path";
-import {aconfigSchema, Config} from "@/config/config-zod-schema";
-import {ConfigPath} from "@/config/config-resolve-model";
+import {promises as fs} from 'fs';
+import path from 'path';
+import {aconfigSchema, Config} from '@/config/config-zod-schema';
+import {ConfigPath} from '@/config/config-resolve-model';
 
 @Injectable()
 export class FileConfigReader {
-
   public data: Config = null!;
 
   constructor(
@@ -21,15 +20,17 @@ export class FileConfigReader {
   };
 
 
-  public canHandle(): Promise<boolean> {
+  public async canHandle(): Promise<boolean> {
     return fs.access(this.confPath).then(() => true).catch(() => false);
   }
 
   public async save(data: Config): Promise<void> {
     this.data = data;
-    setTimeout(async () => {
-      this.logger.log(`Saving data to file ${this.confPath}`)
-      await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
+    setTimeout(() => {
+      this.logger.log(`Saving data to file ${this.confPath}`);
+      fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2)).catch(e => {
+        this.logger.error(`Unable to save config to file ${this.confPath}: \n ${(e as Error).message}`, (e as Error).stack);
+      });
     }, 5000);
   }
 

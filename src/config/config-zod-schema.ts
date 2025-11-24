@@ -1,8 +1,7 @@
 import {z} from 'zod';
-import * as os from "node:os";
 
 // Zod Schemas based on Config.d.ts, default.json, and validation rules from sea.ts
-export const telegramSchema = z.object({
+const telegramSchema = z.object({
   token: z.string()
     .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
     .describe('🔑 Bot token from @BotFather'),
@@ -24,7 +23,7 @@ export const telegramSchema = z.object({
     .default(10),
 });
 
-export const cameraSchema = z.object({
+const cameraSchema = z.object({
   name: z.string()
     .min(1, 'Camera name cannot be empty')
     .describe('📹 Camera name'),
@@ -34,7 +33,7 @@ export const cameraSchema = z.object({
     .default(1),
 });
 
-export const diffSchema = z.object({
+const diffSchema = z.object({
   pixels: z.number()
     .positive('Pixel count must be positive')
     .describe('🔍 Minimum changed pixels required to trigger an alert')
@@ -46,7 +45,7 @@ export const diffSchema = z.object({
     .default(0.1),
 });
 
-export const aconfigSchema = z.object({
+const aconfigSchema = z.object({
   telegram: telegramSchema,
   camera: cameraSchema,
   diff: diffSchema,
@@ -57,4 +56,6 @@ type TelegramConfig = z.infer<typeof telegramSchema>
 type CameraConfig = z.infer<typeof cameraSchema>
 type DiffConfig = z.infer<typeof diffSchema>
 
-export type {Config, TelegramConfig, CameraConfig, DiffConfig}
+
+export {telegramSchema, cameraSchema, diffSchema, aconfigSchema}
+export type {Config, TelegramConfig, CameraConfig, DiffConfig};

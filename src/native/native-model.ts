@@ -11,6 +11,9 @@ interface NativeCameraInfo {
 }
 
 interface INativeModule {
+  // loaded by nodejs
+  path: string;
+
   /**
    * Starts video capture with callback
    * @param deviceName - Name of the video device to capture from
@@ -58,9 +61,6 @@ interface INativeModule {
    * @throws Error if comparison fails
    */
   compareRgbImages(rgbBuffer1: Buffer, rgbBuffer2: Buffer, width: number, height: number, threshold: number): Promise<number>;
-
-  // loaded by nodejs
-  path: string;
 }
 
 export const Native = 'Native';

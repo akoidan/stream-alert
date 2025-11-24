@@ -1,19 +1,16 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
-import {aconfigSchema, Config} from "@/config/config-zod-schema";
+import {aconfigSchema, Config} from '@/config/config-zod-schema';
 import prompts, {Choice, PromptObject, PromptType} from 'prompts';
 
 import {ZodObject, type ZodTypeAny} from 'zod';
-import {INativeModule, Native} from "@/native/native-model";
-import {Telegraf} from "telegraf";
-import {Platform, TelegrafGet} from "@/config/config-resolve-model";
+import {INativeModule, Native} from '@/native/native-model';
+import {Telegraf} from 'telegraf';
+import {Platform, TelegrafGet} from '@/config/config-resolve-model';
 
-interface PromptResponse {
-  [key: string]: string | number | boolean;
-}
+type PromptResponse = Record<string, string | number | boolean>;
 
 @Injectable()
 export class PromptConfigReader {
-
   private tGToken: string | null = null;
 
   constructor(
@@ -31,7 +28,7 @@ export class PromptConfigReader {
     if (!this.tGToken) {
       throw new Error('Unexpected validation error');
     }
-    const bot = this.getTG(this.tGToken!)
+    const bot = this.getTG(this.tGToken!);
     const tokenValid = await bot.telegram.getChat(value).then(() => true).catch(() => false);
     if (!tokenValid) {
       return 'ChatID not found';
@@ -40,7 +37,7 @@ export class PromptConfigReader {
   }
 
   public async validateTgToken(value: any) {
-    const bot = this.getTG(value)
+    const bot = this.getTG(value);
     const tokenValid = await bot.telegram.getMe().then(() => true).catch(() => false);
     if (!tokenValid) {
       return 'Invalid token';
@@ -71,7 +68,7 @@ export class PromptConfigReader {
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
 
-      if ((zodField._def as any).typeName || zodField.shape !== undefined ) {
+      if ((zodField._def as any).typeName || zodField.shape !== undefined) {
         // Nested object - recurse with the nested schema
         this.addQuestions(prefix, zodField, questions, currentPath);
       } else {
@@ -85,43 +82,42 @@ export class PromptConfigReader {
   private createQuestion(fieldName: string, zodField: ZodTypeAny): PromptObject {
     const descrp = this.unwrapZodField(zodField).description;
     if (!descrp) {
-      throw Error(`${fieldName} doesnt have description`)
+      throw Error(`${fieldName} doesnt have description`);
     }
     if (fieldName === 'camera.name') {
       const cameras = this.native.listAvailableCameras();
       if (cameras.length === 0) {
-        throw Error(`Cannot find any cameras in the system`);
+        throw Error('Cannot find any cameras in the system');
       }
       const choices: Choice[] = cameras.map(c => ({
         title: c.name,
-        value: this.platform === 'linux' ? c.path : c.name
+        value: this.platform === 'linux' ? c.path : c.name,
       }));
       return {
         type: 'select',
         name: fieldName,
         message: descrp,
         choices,
-      }
-    } else {
-      return {
-        type: this.detectFieldType(zodField) as PromptType,
-        name: fieldName,
-        message: descrp,
-        initial: (zodField as any).def.defaultValue,
-        validate: async (value: string | number | boolean) => {
-          const result = zodField.safeParse(value);
-          if (result.success) {
-            if (fieldName === 'telegram.chatId') {
-              return this.validateTgChat(value);
-            } else if (fieldName === 'telegram.token') {
-              return this.validateTgToken(value);
-            }
-            return true;
-          }
-          return result.error?.issues[0]?.message || 'Invalid value';
-        }
       };
     }
+    return {
+      type: this.detectFieldType(zodField) as PromptType,
+      name: fieldName,
+      message: descrp,
+      initial: (zodField as any).def.defaultValue,
+      validate: async(value: string | number | boolean) => {
+        const result = zodField.safeParse(value);
+        if (result.success) {
+          if (fieldName === 'telegram.chatId') {
+            return this.validateTgChat(value);
+          } else if (fieldName === 'telegram.token') {
+            return this.validateTgToken(value);
+          }
+          return true;
+        }
+        return result.error?.issues[0]?.message || 'Invalid value';
+      },
+    };
   }
 
   // Add validation using Zod
@@ -161,7 +157,9 @@ export class PromptConfigReader {
   private setNestedValue(obj: Record<string, any>, path: string[], value: string | number | boolean): void {
     const lastKey = path.pop()!;
     const target = path.reduce((current, key) => {
-      if (!current[key]) current[key] = {};
+      if (!current[key]) {
+        current[key] = {};
+      }
       return current[key];
     }, obj);
     target[lastKey] = value;
