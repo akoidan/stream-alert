@@ -64,8 +64,12 @@ export class TelegramService {
       this.logger.log(`Awaiting ${this.tgConfig.spamDelay}s before next notificaiton. ${Math.round(diffDate / 1000)}s passed`);
       return;
     }
-    await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
+    await this.sendImageNow(data);
     this.lastNotificationTime = newNotificationTime;
+  }
+
+  public async sendImageNow(data: Buffer): Promise<void> {
+    await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
     this.logger.log('Notification sent');
   }
 

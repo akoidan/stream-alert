@@ -31,11 +31,12 @@ describe('AppService', () => {
       setup: jest.fn(),
       sendText: jest.fn(),
       sendImage: jest.fn(),
+      sendImageNow: jest.fn(),
     } as any;
 
     mockImagelibService = {
       conf: {
-        threshold: 100,
+        pixels: 100,
       },
       getLastImage: jest.fn(),
       getImageIfItsChanged: jest.fn(),
@@ -73,11 +74,11 @@ describe('AppService', () => {
   describe('onIncreaseThreshold', () => {
     it('should double the threshold and send notification', async () => {
       const initialThreshold = 100;
-      mockImagelibService.conf.threshold = initialThreshold;
+      mockImagelibService.conf.pixels = initialThreshold;
 
       await service.onIncreaseThreshold();
 
-      expect(mockImagelibService.conf.threshold).toBe(initialThreshold * 2);
+      expect(mockImagelibService.conf.pixels).toBe(initialThreshold * 2);
       expect(mockTelegramService.sendText).toHaveBeenCalledWith(`Increase threshold to ${initialThreshold * 2}`);
     });
   });
@@ -85,11 +86,11 @@ describe('AppService', () => {
   describe('onDecreaseThreshold', () => {
     it('should halve the threshold and send notification', async () => {
       const initialThreshold = 100;
-      mockImagelibService.conf.threshold = initialThreshold;
+      mockImagelibService.conf.pixels = initialThreshold;
 
       await service.onDecreaseThreshold();
 
-      expect(mockImagelibService.conf.threshold).toBe(Math.ceil(initialThreshold / 2));
+      expect(mockImagelibService.conf.pixels).toBe(Math.ceil(initialThreshold / 2));
       expect(mockTelegramService.sendText).toHaveBeenCalledWith(`Decreased threshold to ${Math.ceil(initialThreshold / 2)}`);
     });
   });
@@ -103,7 +104,7 @@ describe('AppService', () => {
 
       expect(mockLogger.log).toHaveBeenCalledWith('Got image command');
       expect(mockImagelibService.getLastImage).toHaveBeenCalled();
-      expect(mockTelegramService.sendImage).toHaveBeenCalledWith(mockImageBuffer);
+      expect(mockTelegramService.sendImageNow).toHaveBeenCalledWith(mockImageBuffer);
     });
 
     it('should send no image message when no image available', async () => {
@@ -126,7 +127,7 @@ describe('AppService', () => {
 
       await service.onSetThreshold(mockContext);
 
-      expect(mockImagelibService.conf.threshold).toBe(150);
+      expect(mockImagelibService.conf.pixels).toBe(150);
       expect(mockTelegramService.sendText).not.toHaveBeenCalled();
     });
 
@@ -146,11 +147,11 @@ describe('AppService', () => {
       const mockContext: CommandContextExtn = {
         payload: '0',
       } as any;
-      const initialThreshold = mockImagelibService.conf.threshold;
+      const initialThreshold = mockImagelibService.conf.pixels;
 
       await service.onSetThreshold(mockContext);
 
-      expect(mockImagelibService.conf.threshold).toBe(initialThreshold);
+      expect(mockImagelibService.conf.pixels).toBe(initialThreshold);
       expect(mockTelegramService.sendText).toHaveBeenCalledWith(
         'set_threshold required number parameter. 0 is not a number'
       );

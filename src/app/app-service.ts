@@ -31,7 +31,7 @@ export class AppService implements GlobalService {
     this.logger.log('Got image command');
     const image = await this.im.getLastImage();
     if (image) {
-      await this.telegram.sendImage(image);
+      await this.telegram.sendImageNow(image);
     } else {
       await this.telegram.sendText('No image in cache');
       this.logger.log('No current image found, skipping');
