@@ -1,17 +1,17 @@
 import {Logger, Module} from '@nestjs/common';
 import {
-  CameraConfData, ConfigPath,
+  CameraConfData,
+  ConfigPath,
   DiffConfData,
-  IConfigResolver, Platform,
+  IConfigResolver,
+  Platform,
+  PromptSetup,
   TelegrafGet,
   TelegramConfigData
 } from "@/config/config-resolve-model";
-import {FileConfigReader} from "@/config/file-config-reader.service";
 import {isSea} from "node:sea";
 import {PromptConfigReader} from "@/config/promt-config-reader.service";
 import {NativeModule} from "@/native/native-module";
-import {INativeModule, Native} from "@/native/native-model";
-import {FieldsValidator} from "@/config/fields-validator";
 import {Telegraf} from "telegraf";
 
 
@@ -20,7 +20,7 @@ import {Telegraf} from "telegraf";
   exports: [TelegramConfigData, CameraConfData, DiffConfData],
   providers: [
     Logger,
-    FieldsValidator,
+    PromptConfigReader,
     {
       provide: TelegrafGet,
       useValue: (s: string) => new Telegraf(s)
@@ -34,28 +34,27 @@ import {Telegraf} from "telegraf";
       useValue: isSea() ? __dirname : process.cwd()
     },
     {
-      provide: FileConfigReader,
-      inject: [Logger, ConfigPath, FieldsValidator],
-      useFactory: async (logger: Logger, cp: string, validator: FieldsValidator): Promise<FileConfigReader> => {
-        const data = new PromptConfigReader(logger, cp, validator);
-        await data.load()
-        return data;
-      },
+      provide: PromptSetup,
+      inject: [PromptConfigReader],
+      useFactory: async(cr: PromptConfigReader) => {
+        await cr.load()
+        return cr;
+      }
     },
     {
       provide: DiffConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
-      inject: [FileConfigReader],
+      inject: [PromptSetup],
     },
     {
       provide: CameraConfData,
       useFactory: (resolver: IConfigResolver) => resolver.getCameraConfig(),
-      inject: [FileConfigReader],
+      inject: [PromptSetup],
     },
     {
       provide: TelegramConfigData,
       useFactory: (resolver: IConfigResolver) => resolver.getTGConfig(),
-      inject: [FileConfigReader],
+      inject: [PromptSetup],
     }
   ],
 })

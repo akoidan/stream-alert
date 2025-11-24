@@ -15,3 +15,5 @@ export interface IConfigResolver {
 export const TelegrafGet = 'TelegrafGet';
 export const Platform = 'Platform';
 export const ConfigPath = 'ConfigPath';
+
+export const PromptSetup = 'PromptSetup';

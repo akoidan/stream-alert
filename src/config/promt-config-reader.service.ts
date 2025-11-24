@@ -1,17 +1,33 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {aconfigSchema} from "@/config/config-zod-schema";
+import {Inject, Injectable, Logger} from '@nestjs/common';
+import {aconfigSchema, Config} from "@/config/config-zod-schema";
 import {FileConfigReader} from "@/config/file-config-reader.service";
-import prompts from 'prompts';
+import prompts, {PromptObject, PromptType} from 'prompts';
 import {promises as fs} from "fs";
-import {FieldsValidator} from "@/config/fields-validator";
+
+import {ZodObject, type ZodTypeAny} from 'zod';
+import {INativeModule, Native} from "@/native/native-model";
+import {Telegraf} from "telegraf";
+import {ConfigPath, Platform, TelegrafGet} from "@/config/config-resolve-model";
+
+interface PromptResponse {
+  [key: string]: string | number | boolean;
+}
 
 @Injectable()
 export class PromptConfigReader extends FileConfigReader {
 
+  private tGToken: string | null = null;
+
   constructor(
     logger: Logger,
+    @Inject(ConfigPath)
     configsPath: string,
-    private readonly validator: FieldsValidator,
+    @Inject(Native)
+    private readonly native: INativeModule,
+    @Inject(Platform)
+    private readonly platform: NodeJS.Platform,
+    @Inject(TelegrafGet)
+    private readonly getTG: (s: string) => Telegraf,
   ) {
     super(logger, configsPath)
   }
@@ -24,15 +40,37 @@ export class PromptConfigReader extends FileConfigReader {
     return true;
   }
 
+  public async validateTgChat(value: any) {
+    if (!this.tGToken) {
+      throw new Error('Unexpected validation error');
+    }
+    const bot = this.getTG(this.tGToken!)
+    const tokenValid = await bot.telegram.getChat(value).then(() => true).catch(() => false);
+    if (!tokenValid) {
+      return 'ChatID not found';
+    }
+    return true;
+  }
+
+  public async validateTgToken(value: any) {
+    const bot = this.getTG(value)
+    const tokenValid = await bot.telegram.getMe().then(() => true).catch(() => false);
+    if (!tokenValid) {
+      return 'Invalid token';
+    }
+    this.tGToken = value;
+    return true;
+  }
+
   private async promptForConfiguration() {
     this.logger.log('\n🤖 First, create a Telegram bot:\n'
       + '  1. Open @BotFather in Telegram\n'
       + '  2. Send /newbot and follow the instructions\n'
       + '  3. Save the bot token for the next step\n');
 
-    const questions: any[] = [];
+    const questions: PromptObject[] = [];
 
-    this.addQuestions('', aconfigSchema, questions);
+    this.addQuestions('', aconfigSchema, questions, []);
 
     const responses = await prompts(questions);
 
@@ -42,15 +80,15 @@ export class PromptConfigReader extends FileConfigReader {
     await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
   }
 
-  private addQuestions(prefix: string, schema: any, questions: any[], path: string[] = []): void {
+  private addQuestions(prefix: string, schema: ZodObject, questions: PromptObject[], path: string[]): void {
     const shape = schema.shape;
 
     for (const [key, fieldSchema] of Object.entries(shape)) {
-      const zodField = fieldSchema as any;
+      const zodField = fieldSchema as ZodObject;
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
 
-      if (zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined) {
+      if ((zodField._def as any).typeName || zodField.shape !== undefined ) {
         // Nested object - recurse with the nested schema
         this.addQuestions(prefix, zodField, questions, currentPath);
       } else {
@@ -61,39 +99,50 @@ export class PromptConfigReader extends FileConfigReader {
     }
   }
 
-  private createQuestion(fieldName: string, zodField: any): any {
-    const type = this.detectFieldType(zodField);
-    const description = zodField._def.description || fieldName;
-    const defaultValue = this.getDefaultValue(zodField);
+  private createQuestion(fieldName: string, zodField: ZodTypeAny): PromptObject {
 
-    const question: any = {
-      type,
-      name: fieldName,
-      message: description,
-      initial: defaultValue
-    };
+    if (!(zodField._def as ZodTypeAny).description) {
+      throw Error(`${fieldName} doesnt have description`)
+    }
+    if (fieldName === 'camera.name') {
+      const cameras = this.native.listAvailableCameras();
 
-    // Add validation using Zod
-    question.validate = async (value: any) => {
-
-      const result = zodField.safeParse(value);
-      if (result.success) {
-        if (fieldName === 'telegram.chatId') {
-          return this.validator.validateTgChat(value);
-        } else if (fieldName === 'telegram.token') {
-          return this.validator.validateTgToken(value);
-        } else if (fieldName === "camera.name") {
-          return this.validator.validateCamera(value);
-        }
-        return true;
+      return {
+        type: 'select',
+        name: fieldName,
+        message: (zodField._def as ZodTypeAny).description,
+        choices: cameras.map(c => ({
+          title: c.name,
+          value: this.platform === 'linux' ? c.path : c.name
+        }))
       }
-      return result.error?.issues[0]?.message || 'Invalid value';
-    };
-
-    return question;
+    } else {
+      const defaultValue = this.getDefaultValue(zodField);
+      return {
+        type: this.detectFieldType(zodField) as PromptType,
+        name: fieldName,
+        message: (zodField._def as any).description,
+        initial: defaultValue,
+        validate: async (value: string | number | boolean) => {
+          const result = zodField.safeParse(value);
+          if (result.success) {
+            if (fieldName === 'telegram.chatId') {
+              return this.validateTgChat(value);
+            } else if (fieldName === 'telegram.token') {
+              return this.validateTgToken(value);
+            }
+            return true;
+          }
+          return result.error?.issues[0]?.message || 'Invalid value';
+        }
+      };
+    }
   }
 
-  private detectFieldType(zodField: any): string {
+  // Add validation using Zod
+
+
+  private detectFieldType(zodField: ZodTypeAny): string {
     let type = 'text';
     const innerType = this.unwrapZodField(zodField);
 
@@ -106,26 +155,29 @@ export class PromptConfigReader extends FileConfigReader {
     return type;
   }
 
-  private unwrapZodField(zodField: any): any {
+  private unwrapZodField(zodField: ZodTypeAny): ZodTypeAny {
     let innerType = zodField;
+    const def = innerType._def as any;
 
     // Unwrap ZodDefault if present (type: "default")
-    if (innerType._def.type === 'default') {
-      innerType = innerType._def.innerType;
+    if (def.type === 'default') {
+      innerType = def.innerType;
     }
 
     // Unwrap ZodEffects if present (from .int(), .min(), etc.)
-    if (innerType._def.type === 'effect') {
-      innerType = innerType._def.schema;
+    const innerDef = innerType._def as any;
+    if (innerDef.typeName === 'ZodEffects') {
+      innerType = innerDef.innerType;
     }
 
     return innerType;
   }
 
-  private getDefaultValue(zodField: any): any {
-    if (zodField._def.type === 'default') {
+  private getDefaultValue(zodField: ZodTypeAny): string | number | boolean | undefined {
+    const def = zodField._def as any;
+    if (def.typeName === 'ZodDefault') {
       try {
-        return zodField._def.defaultValue;
+        return def.defaultValue();
       } catch {
         return undefined;
       }
@@ -133,7 +185,7 @@ export class PromptConfigReader extends FileConfigReader {
     return undefined;
   }
 
-  private setNestedValue(obj: any, path: string[], value: any): void {
+  private setNestedValue(obj: Record<string, any>, path: string[], value: string | number | boolean): void {
     const lastKey = path.pop()!;
     const target = path.reduce((current, key) => {
       if (!current[key]) current[key] = {};
@@ -143,9 +195,9 @@ export class PromptConfigReader extends FileConfigReader {
   }
 
 
-  private updateDataFromResponsesRecursive(responses: any) {
+  private updateDataFromResponsesRecursive(responses: PromptResponse) {
     // Start with empty object
-    this.data = {} as any;
+    this.data = {} as Config;
 
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {
