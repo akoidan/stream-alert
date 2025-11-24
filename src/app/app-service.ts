@@ -18,13 +18,13 @@ export class AppService implements GlobalService {
   }
 
   async onIncreaseThreshold(): Promise<void> {
-    this.im.conf.threshold = Math.ceil(this.im.conf.threshold * 2);
-    await this.telegram.sendText(`Increase threshold to ${this.im.conf.threshold}`);
+    this.im.conf.pixels = Math.ceil(this.im.conf.pixels * 2);
+    await this.telegram.sendText(`Increase threshold to ${this.im.conf.pixels}`);
   }
 
   async onDecreaseThreshold(): Promise<void> {
-    this.im.conf.threshold = Math.ceil(this.im.conf.threshold / 2);
-    await this.telegram.sendText(`Decreased threshold to ${this.im.conf.threshold}`);
+    this.im.conf.pixels = Math.ceil(this.im.conf.pixels / 2);
+    await this.telegram.sendText(`Decreased threshold to ${this.im.conf.pixels}`);
   }
 
   async onAskImage(): Promise<void> {
@@ -41,7 +41,7 @@ export class AppService implements GlobalService {
   async onSetThreshold(a: CommandContextExtn): Promise<void> {
     const newThreshold = Number(a.payload);
     if (newThreshold > 0) {
-      this.im.conf.threshold = newThreshold;
+      this.im.conf.pixels = newThreshold;
     } else {
       await this.telegram.sendText(`${TelegramCommands.set_threshold} required number parameter. ${a.payload} is not a number`);
     }
