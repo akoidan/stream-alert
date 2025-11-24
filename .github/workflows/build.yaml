@@ -48,7 +48,9 @@ jobs:
       - name: Cache APT Packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt/archives
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
           key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yaml') }}
           restore-keys: |
             apt-cache-${{ runner.os }}-
