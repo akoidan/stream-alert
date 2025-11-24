@@ -30,8 +30,28 @@ jobs:
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Check Eslint
+      - name: Lint
         run: yarn lint
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Restore node_modules cache
+        id: cache-node
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+      - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+      - name: Nest
+        run: yarn nest
   jest:
     runs-on: ubuntu-22.04
     steps:
@@ -50,7 +70,7 @@ jobs:
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Check Eslint
+      - name: Tests
         run: yarn jest
 
   linux:
@@ -88,13 +108,14 @@ jobs:
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Check Eslint
+      - name: Cmake
         run: yarn cmake
 
   win32:
     runs-on: windows-2022
     permissions: write-all
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -109,5 +130,5 @@ jobs:
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Check Eslint
+      - name: Cmake
         run: yarn cmake
