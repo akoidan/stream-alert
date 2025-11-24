@@ -21,7 +21,12 @@ std::string GuidToString(const GUID& guid) {
     if (StringFromCLSID(guid, &guidString) == S_OK && guidString) {
         std::wstring wideStr(guidString);
         CoTaskMemFree(guidString);
-        return std::string(wideStr.begin(), wideStr.end());
+        int size = WideCharToMultiByte(CP_UTF8, 0, wideStr.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (size > 0) {
+            std::string result(size - 1, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, wideStr.c_str(), -1, &result[0], size, nullptr, nullptr);
+            return result;
+        }
     }
     return "<unknown-guid>";
 }

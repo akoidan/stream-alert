@@ -37,9 +37,9 @@ async function main() {
     ],
     logLevel: 'info'
   })
+  await fs.writeFile(resolve(__dirname,  'dist', 'esbuild.json'), JSON.stringify(result.metafile, null, 2))
   const analysis = await esbuild.analyzeMetafile(result.metafile, { verbose: true });
-  console.log(analysis);
-
+  await fs.writeFile(resolve(__dirname,  'dist', 'esbuild.txt'), analysis);
 }
 
 main();
