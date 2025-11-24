@@ -2,30 +2,65 @@ import { Logger } from '@nestjs/common';
 import { PromptConfigReader } from '../src/config/promt-config-reader.service';
 import { aconfigSchema } from '../src/config/config-zod-schema';
 import prompts from 'prompts';
+import { INativeModule } from '../src/native/native-model';
+import { Telegraf } from 'telegraf';
 
 // Mock the prompts module
 jest.mock('prompts');
 const mockedPrompts = prompts as jest.MockedFunction<typeof prompts>;
 
-// Mock FieldsValidator to avoid dependency injection issues
-class MockFieldsValidator {
-  public validateCamera(value: any) {
-    return true;
-  }
-  
-  public async validateTgChat(value: any) {
-    return true;
-  }
-  
-  public async validateTgToken(value: any) {
-    return true;
-  }
-
+// Mock native module
+class MockNativeModule implements INativeModule {
+  path = '/mock/native/path';
+  start = jest.fn();
+  stop = jest.fn();
+  getFrame = jest.fn();
+  listAvailableCameras = jest.fn().mockReturnValue([
+    { name: 'Test Camera 1', path: '/dev/video0' },
+    { name: 'Test Camera 2', path: '/dev/video1' }
+  ]);
+  convertRgbToJpeg = jest.fn();
+  compareRgbImages = jest.fn();
 }
+
+// Mock Telegraf getter
+const mockTelegrafGetter = jest.fn().mockImplementation((token: string) => {
+  if (token === 'invalid') {
+    return {
+      telegram: {
+        getMe: jest.fn().mockRejectedValue(new Error('Invalid token')),
+        getChat: jest.fn().mockRejectedValue(new Error('Chat not found'))
+      }
+    };
+  }
+  
+  if (token === '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789') {
+    return {
+      telegram: {
+        getMe: jest.fn().mockResolvedValue({ username: 'testbot' }),
+        getChat: jest.fn().mockImplementation((chatId: number) => {
+          if (chatId === 999999999) {
+            return Promise.reject(new Error('ChatID not found'));
+          }
+          return Promise.resolve({ id: chatId });
+        })
+      }
+    };
+  }
+  
+  return {
+    telegram: {
+      getMe: jest.fn().mockResolvedValue({ username: 'testbot' }),
+      getChat: jest.fn().mockResolvedValue({ id: 123456789 })
+    }
+  };
+});
 
 describe('ReaderConfigService', () => {
   let service: PromptConfigReader;
   let mockLogger: jest.Mocked<Logger>;
+  let mockNative: MockNativeModule;
+  let mockPlatform: NodeJS.Platform;
 
   beforeEach(() => {
     mockLogger = {
@@ -36,8 +71,16 @@ describe('ReaderConfigService', () => {
       verbose: jest.fn(),
     } as any;
 
+    mockNative = new MockNativeModule();
+    mockPlatform = 'linux';
+
     // Create service instance directly with test dependencies
-    service = new PromptConfigReader(mockLogger, '/test/configs', new MockFieldsValidator() as any);
+    service = new PromptConfigReader(
+      mockLogger,
+      mockNative as any,
+      mockPlatform,
+      mockTelegrafGetter as any
+    );
   });
 
   afterEach(() => {
@@ -52,7 +95,7 @@ describe('ReaderConfigService', () => {
     it('should create questions for all primitive fields in the schema', () => {
       // Use the addQuestions method directly since createQuestionsFromSchema was removed
       const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions, []);
       
       expect(questions.length).toBeGreaterThan(0);
       
@@ -69,7 +112,7 @@ describe('ReaderConfigService', () => {
 
     it('should use correct types for different field types', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions, []);
 
       const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
       const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
@@ -82,7 +125,7 @@ describe('ReaderConfigService', () => {
 
     it('should use default values from Zod schema', () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions, []);
 
       const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
       const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
@@ -96,40 +139,31 @@ describe('ReaderConfigService', () => {
 
   describe('validation', () => {
     it('should validate telegram token format', async () => {
-      const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
-      
-      const tokenQuestion = questions.find((q: any) => q.name === 'telegram.token');
-      const validate = tokenQuestion.validate;
-
-      // Valid token (matches the regex: 10 digits : 35 alphanumeric chars)
-      const result1 = await validate('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
+      // Test the service's validateTgToken method directly
+      const result1 = await service.validateTgToken('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
       expect(result1).toBe(true);
       
-      // Invalid token
-      const result2 = await validate('invalid');
-      expect(result2).toBe('Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss');
+      // Test invalid token
+      const result2 = await service.validateTgToken('invalid');
+      expect(result2).toBe('Invalid token');
     });
 
     it('should validate chat ID format', async () => {
-      const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      // First set a valid token to enable chat validation
+      await service.validateTgToken('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
       
-      const chatIdQuestion = questions.find((q: any) => q.name === 'telegram.chatId');
-      const validate = chatIdQuestion.validate;
-
-      // Valid chat ID
-      const result1 = await validate(123456789);
+      // Test the service's validateTgChat method directly
+      const result1 = await service.validateTgChat(123456789);
       expect(result1).toBe(true);
       
-      // Invalid chat ID
-      const result2 = await validate(1000);
-      expect(result2).toBe('Invalid Chat format');
+      // Test invalid chat ID
+      const result2 = await service.validateTgChat(999999999);
+      expect(result2).toBe('ChatID not found');
     });
 
     it('should validate frame rate', async () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions, []);
       
       const frameRateQuestion = questions.find((q: any) => q.name === 'camera.frameRate');
       const validate = frameRateQuestion.validate;
@@ -147,7 +181,7 @@ describe('ReaderConfigService', () => {
 
     it('should validate threshold range', async () => {
       const questions: any[] = [];
-      (service as any).addQuestions('', aconfigSchema, questions);
+      (service as any).addQuestions('', aconfigSchema, questions, []);
       
       const thresholdQuestion = questions.find((q: any) => q.name === 'diff.threshold');
       const validate = thresholdQuestion.validate;
@@ -186,31 +220,43 @@ describe('ReaderConfigService', () => {
     });
   });
 
-  describe('updateDataFromResponsesRecursive', () => {
-    it('should initialize data with schema defaults and update with responses', () => {
-      const updateData = (service as any).updateDataFromResponsesRecursive.bind(service);
-      
+  describe('load method integration', () => {
+    it('should load complete configuration successfully', async () => {
       const mockResponses = {
         'telegram.token': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789',
         'telegram.chatId': 123456789,
-        'camera.name': 'Test Camera',
+        'telegram.spamDelay': 600,
+        'telegram.message': 'Custom message',
+        'telegram.initialDelay': 15,
+        'camera.name': 'Test Camera 1',
+        'camera.frameRate': 10,
         'diff.pixels': 2000,
+        'diff.threshold': 0.2,
       };
 
-      updateData(mockResponses);
+      mockedPrompts.mockResolvedValue(mockResponses);
 
-      // Check that data was initialized with responses only
-      expect(service.getTGConfig().token).toBe('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789');
-      expect(service.getTGConfig().chatId).toBe(123456789);
-      expect(service.getCameraConfig().name).toBe('Test Camera');
-      expect(service.getDiffConfig().pixels).toBe(2000);
-      
-      // Other fields should be undefined since they weren't provided
-      expect(service.getTGConfig().spamDelay).toBeUndefined();
-      expect(service.getTGConfig().message).toBeUndefined();
-      expect(service.getTGConfig().initialDelay).toBeUndefined();
-      expect(service.getCameraConfig().frameRate).toBeUndefined();
-      expect(service.getDiffConfig().threshold).toBeUndefined();
+      const result = await service.load();
+
+      expect(result).toEqual({
+        telegram: {
+          token: '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789',
+          chatId: 123456789,
+          spamDelay: 600,
+          message: 'Custom message',
+          initialDelay: 15,
+        },
+        camera: {
+          name: 'Test Camera 1',
+          frameRate: 10,
+        },
+        diff: {
+          pixels: 2000,
+          threshold: 0.2,
+        },
+      });
+
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('🤖 First, create a Telegram bot'));
     });
   });
 });
