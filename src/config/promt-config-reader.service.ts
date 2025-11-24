@@ -57,6 +57,9 @@ export class PromptConfigReader {
     this.addQuestions('', aconfigSchema, questions, []);
 
     const responses = await prompts(questions);
+    if (questions.length !== responses.length) {
+      throw Error('Not all questions were answered');
+    }
 
     // Update the data with responses using recursive mapping
     return this.updateDataFromResponsesRecursive(responses);
@@ -107,6 +110,7 @@ export class PromptConfigReader {
       message: descrp,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       initial: (zodField as any).def.defaultValue,
+      float: fieldName === 'diff.threshold',
       validate: async(value: string | number | boolean): Promise<boolean | string> => {
         const result = zodField.safeParse(value);
         if (result.success) {
