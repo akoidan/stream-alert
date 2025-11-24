@@ -12,6 +12,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Restore node_modules cache
+        id: cache-node
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+      - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+      - name: Check Eslint
+        run: yarn lint
   jest:
     runs-on: ubuntu-22.04
     steps:
@@ -19,14 +39,19 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: yarn
+      - name: Restore node_modules cache
+        id: cache-node
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Build
-        run: yarn test
-      - name: test
-        run: yarn nest
+      - name: Check Eslint
+        run: yarn jest
 
   linux:
     runs-on: ubuntu-24.04
@@ -34,8 +59,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache APT Packages
-        uses: actions/cache@v4
+      - name: Restore Cache APT Packages
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
         with:
           path: /var/cache/apt/archives
           key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/pr.yaml') }}
@@ -50,27 +77,37 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: yarn
-
+      - name: Restore node_modules cache
+        id: cache-node
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-
-      - name: Build native .node modules
+      - name: Check Eslint
         run: yarn cmake
 
   win32:
     runs-on: windows-2022
     permissions: write-all
     steps:
-      - uses: actions/checkout@v3
-
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: yarn
-
+      - name: Restore node_modules cache
+        id: cache-node
+        # DO not create cache for PRs, since they are not accessible withing different PRs
+        # Only restore them
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-
-      - name: Build native .node modules
+      - name: Check Eslint
         run: yarn cmake
