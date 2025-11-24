@@ -16,4 +16,4 @@ export const TelegrafGet = 'TelegrafGet';
 export const Platform = 'Platform';
 export const ConfigPath = 'ConfigPath';
 
-export const PromptSetup = 'PromptSetup';
+export const ConfigData = 'ConfigData';

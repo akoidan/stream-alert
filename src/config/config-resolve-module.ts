@@ -1,11 +1,10 @@
 import {Logger, Module} from '@nestjs/common';
 import {
   CameraConfData,
+  ConfigData,
   ConfigPath,
   DiffConfData,
-  IConfigResolver,
   Platform,
-  PromptSetup,
   TelegrafGet,
   TelegramConfigData
 } from "@/config/config-resolve-model";
@@ -13,6 +12,8 @@ import {isSea} from "node:sea";
 import {PromptConfigReader} from "@/config/promt-config-reader.service";
 import {NativeModule} from "@/native/native-module";
 import {Telegraf} from "telegraf";
+import {FileConfigReader} from "@/config/file-config-reader.service";
+import {Config} from "@/config/config-zod-schema";
 
 
 @Module({
@@ -20,6 +21,7 @@ import {Telegraf} from "telegraf";
   exports: [TelegramConfigData, CameraConfData, DiffConfData],
   providers: [
     Logger,
+    FileConfigReader,
     PromptConfigReader,
     {
       provide: TelegrafGet,
@@ -34,27 +36,32 @@ import {Telegraf} from "telegraf";
       useValue: isSea() ? __dirname : process.cwd()
     },
     {
-      provide: PromptSetup,
-      inject: [PromptConfigReader],
-      useFactory: async(cr: PromptConfigReader) => {
-        await cr.load()
-        return cr;
+      provide: ConfigData,
+      inject: [PromptConfigReader, FileConfigReader],
+      useFactory: async(cr: PromptConfigReader, fr: FileConfigReader) => {
+        if (await fr.canHandle()) {
+          await fr.load()
+        } else {
+          const data = await cr.load()
+          await fr.save(data);
+        }
+        return fr.data;
       }
     },
     {
       provide: DiffConfData,
-      useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
-      inject: [PromptSetup],
+      useFactory: (resolver: Config) => resolver.diff,
+      inject: [ConfigData],
     },
     {
       provide: CameraConfData,
-      useFactory: (resolver: IConfigResolver) => resolver.getCameraConfig(),
-      inject: [PromptSetup],
+      useFactory: (resolver: Config) => resolver.camera,
+      inject: [ConfigData],
     },
     {
       provide: TelegramConfigData,
-      useFactory: (resolver: IConfigResolver) => resolver.getTGConfig(),
-      inject: [PromptSetup],
+      useFactory: (resolver: Config) => resolver.telegram,
+      inject: [ConfigData],
     }
   ],
 })

@@ -1,27 +1,23 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {aconfigSchema, Config} from "@/config/config-zod-schema";
-import {FileConfigReader} from "@/config/file-config-reader.service";
 import prompts, {Choice, PromptObject, PromptType} from 'prompts';
-import {promises as fs} from "fs";
 
 import {ZodObject, type ZodTypeAny} from 'zod';
 import {INativeModule, Native} from "@/native/native-model";
 import {Telegraf} from "telegraf";
-import {ConfigPath, Platform, TelegrafGet} from "@/config/config-resolve-model";
+import {Platform, TelegrafGet} from "@/config/config-resolve-model";
 
 interface PromptResponse {
   [key: string]: string | number | boolean;
 }
 
 @Injectable()
-export class PromptConfigReader extends FileConfigReader {
+export class PromptConfigReader {
 
   private tGToken: string | null = null;
 
   constructor(
-    logger: Logger,
-    @Inject(ConfigPath)
-    configsPath: string,
+    private readonly logger: Logger,
     @Inject(Native)
     private readonly native: INativeModule,
     @Inject(Platform)
@@ -29,15 +25,6 @@ export class PromptConfigReader extends FileConfigReader {
     @Inject(TelegrafGet)
     private readonly getTG: (s: string) => Telegraf,
   ) {
-    super(logger, configsPath)
-  }
-
-  public async load(): Promise<boolean> {
-    const success = await super.load()
-    if (!success) {
-      await this.promptForConfiguration();
-    }
-    return true;
   }
 
   public async validateTgChat(value: any) {
@@ -62,7 +49,7 @@ export class PromptConfigReader extends FileConfigReader {
     return true;
   }
 
-  private async promptForConfiguration() {
+  public async load(): Promise<Config> {
     this.logger.log('\n🤖 First, create a Telegram bot:\n'
       + '  1. Open @BotFather in Telegram\n'
       + '  2. Send /newbot and follow the instructions\n'
@@ -75,13 +62,7 @@ export class PromptConfigReader extends FileConfigReader {
     const responses = await prompts(questions);
 
     // Update the data with responses using recursive mapping
-    this.updateDataFromResponsesRecursive(responses);
-    // save current file only if app is still alive in 5s
-    // otherwise prompt can be interrupted, and interruption with prompt still executes some code
-    setTimeout(async () => {
-      this.logger.log(`Saving data to file ${this.confPath}`)
-      await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
-    }, 5000);
+    return this.updateDataFromResponsesRecursive(responses);
   }
 
   private addQuestions(prefix: string, schema: ZodObject, questions: PromptObject[], path: string[]): void {
@@ -187,14 +168,15 @@ export class PromptConfigReader extends FileConfigReader {
   }
 
 
-  private updateDataFromResponsesRecursive(responses: PromptResponse) {
+  private updateDataFromResponsesRecursive(responses: PromptResponse): Config {
     // Start with empty object
-    this.data = {} as Config;
+    const data: Config = {} as Config;
 
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {
       const path = fieldName.split('.'); // Split "telegram.token" -> ["telegram", "token"]
-      this.setNestedValue(this.data, path, value);
+      this.setNestedValue(data, path, value);
     }
+    return data;
   }
 }
