@@ -61,9 +61,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: yarn
+
+      - uses: actions/cache@v4
+        id: cache-node
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules
@@ -99,9 +105,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: yarn
+
+      - uses: actions/cache@v4
+        id: cache-node
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules

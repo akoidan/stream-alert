@@ -85,7 +85,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/pr.yaml') }}
+          # Should use cache from build.yaml rather than pr.yaml as it was used for create
+          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yaml') }}
           restore-keys: |
             apt-cache-${{ runner.os }}-
 
