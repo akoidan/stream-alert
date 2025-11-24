@@ -222,6 +222,7 @@ describe('ReaderConfigService', () => {
 
   describe('load method integration', () => {
     it('should load complete configuration successfully', async () => {
+      // Mock responses for all fields
       const mockResponses = {
         'telegram.token': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789',
         'telegram.chatId': 123456789,
@@ -234,7 +235,16 @@ describe('ReaderConfigService', () => {
         'diff.threshold': 0.2,
       };
 
-      mockedPrompts.mockResolvedValue(mockResponses);
+      // Mock prompts to return responses with correct length property
+      mockedPrompts.mockImplementation((questions: any) => {
+        const responses = { ...mockResponses };
+        // Set the length property to match the number of questions
+        Object.defineProperty(responses, 'length', {
+          value: Array.isArray(questions) ? questions.length : 1,
+          enumerable: false
+        });
+        return Promise.resolve(responses);
+      });
 
       const result = await service.load();
 

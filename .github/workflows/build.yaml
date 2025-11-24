@@ -75,15 +75,6 @@ jobs:
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
-      - name: Test Coverage
-        run: yarn jest
-
-      - name: Upload coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: coverage/lcov.info
-
       - name: Build native .node modules
         run: yarn cmake
 
@@ -105,6 +96,14 @@ jobs:
           asset_path: ./dist/stream-alert.exe
           asset_name: stream-alert.elf
           asset_content_type: application/x-executable
+      - name: Test Coverage
+        run: yarn jest
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: coverage/lcov.info
 
   win32:
     needs: [ create_release ]
