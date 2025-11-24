@@ -1,18 +1,19 @@
 import {Logger, Module} from '@nestjs/common';
 import {
-  CameraConfData, ConfigPath,
+  CameraConfData,
+  ConfigData,
+  ConfigPath,
   DiffConfData,
-  IConfigResolver, Platform,
+  Platform,
   TelegrafGet,
-  TelegramConfigData
-} from "@/config/config-resolve-model";
-import {FileConfigReader} from "@/config/file-config-reader.service";
-import {isSea} from "node:sea";
-import {PromptConfigReader} from "@/config/promt-config-reader.service";
-import {NativeModule} from "@/native/native-module";
-import {INativeModule, Native} from "@/native/native-model";
-import {FieldsValidator} from "@/config/fields-validator";
-import {Telegraf} from "telegraf";
+  TelegramConfigData,
+} from '@/config/config-resolve-model';
+import {isSea} from 'node:sea';
+import {PromptConfigReader} from '@/config/promt-config-reader.service';
+import {NativeModule} from '@/native/native-module';
+import {Telegraf} from 'telegraf';
+import {FileConfigReader} from '@/config/file-config-reader.service';
+import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-zod-schema';
 
 
 @Module({
@@ -20,43 +21,48 @@ import {Telegraf} from "telegraf";
   exports: [TelegramConfigData, CameraConfData, DiffConfData],
   providers: [
     Logger,
-    FieldsValidator,
+    FileConfigReader,
+    PromptConfigReader,
     {
       provide: TelegrafGet,
-      useValue: (s: string) => new Telegraf(s)
+      useValue: (s: string): Telegraf => new Telegraf(s),
     },
     {
       provide: Platform,
-      useValue: process.platform
+      useValue: process.platform,
     },
     {
       provide: ConfigPath,
-      useValue: isSea() ? __dirname : process.cwd()
+      useValue: isSea() ? __dirname : process.cwd(),
     },
     {
-      provide: FileConfigReader,
-      inject: [Logger, ConfigPath, FieldsValidator],
-      useFactory: async (logger: Logger, cp: string, validator: FieldsValidator): Promise<FileConfigReader> => {
-        const data = new PromptConfigReader(logger, cp, validator);
-        await data.load()
-        return data;
+      provide: ConfigData,
+      inject: [PromptConfigReader, FileConfigReader],
+      useFactory: async(cr: PromptConfigReader, fr: FileConfigReader): Promise<Config> => {
+        if (await fr.canHandle()) {
+          await fr.load();
+        } else {
+          const data = await cr.load();
+          fr.save(data);
+        }
+        return fr.data;
       },
     },
     {
       provide: DiffConfData,
-      useFactory: (resolver: IConfigResolver) => resolver.getDiffConfig(),
-      inject: [FileConfigReader],
+      useFactory: (resolver: Config): DiffConfig => resolver.diff,
+      inject: [ConfigData],
     },
     {
       provide: CameraConfData,
-      useFactory: (resolver: IConfigResolver) => resolver.getCameraConfig(),
-      inject: [FileConfigReader],
+      useFactory: (resolver: Config): CameraConfig => resolver.camera,
+      inject: [ConfigData],
     },
     {
       provide: TelegramConfigData,
-      useFactory: (resolver: IConfigResolver) => resolver.getTGConfig(),
-      inject: [FileConfigReader],
-    }
+      useFactory: (resolver: Config): TelegramConfig => resolver.telegram,
+      inject: [ConfigData],
+    },
   ],
 })
 export class ConfigResolveModule {

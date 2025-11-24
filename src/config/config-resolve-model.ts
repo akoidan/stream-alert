@@ -1,17 +1,26 @@
-import {CameraConfig, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
+import type {CameraConfig, DiffConfig, TelegramConfig} from '@/config/config-zod-schema';
 
 
-export const CameraConfData = 'CameraConf';
-export const TelegramConfigData = 'TelegramConfig';
-export const DiffConfData = 'DiffConf'
+const CameraConfData = 'CameraConf';
+const TelegramConfigData = 'TelegramConfig';
+const DiffConfData = 'DiffConf';
 
-export interface IConfigResolver {
+interface IConfigResolver {
   load(): Promise<boolean>;
+
   getTGConfig(): TelegramConfig;
+
   getDiffConfig(): DiffConfig;
+
   getCameraConfig(): CameraConfig;
 }
 
-export const TelegrafGet = 'TelegrafGet';
-export const Platform = 'Platform';
-export const ConfigPath = 'ConfigPath';
+const TelegrafGet = 'TelegrafGet';
+const Platform = 'Platform';
+const ConfigPath = 'ConfigPath';
+
+const ConfigData = 'ConfigData';
+
+
+export {CameraConfData, TelegramConfigData, DiffConfData, TelegrafGet, Platform, ConfigPath, ConfigData};
+export type {IConfigResolver};

@@ -1,10 +1,10 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
-import {Telegraf} from "telegraf";
-import {TelegramCommands} from "@/telegram/telegram-model";
-import type {TgCommandsExecutor} from "@/app/app-model";
-import {CommandContextExtn} from "telegraf/typings/telegram-types";
-import {TelegramConfigData} from "@/config/config-resolve-model";
-import {TelegramConfig} from "@/config/config-zod-schema";
+import {Telegraf} from 'telegraf';
+import {TelegramCommands} from '@/telegram/telegram-model';
+import type {TgCommandsExecutor} from '@/app/app-model';
+import {CommandContextExtn} from 'telegraf/typings/telegram-types';
+import {TelegramConfigData} from '@/config/config-resolve-model';
+import {TelegramConfig} from '@/config/config-zod-schema';
 
 @Injectable()
 export class TelegramService {
@@ -22,40 +22,31 @@ export class TelegramService {
   }
 
   async setup(commandListener: TgCommandsExecutor): Promise<void> {
-    this.logger.log("Starting telegram service");
-    
+    this.logger.log('Starting telegram service');
+
     // Validate token first
     await this.validateToken();
-    
+
     await this.bot.telegram.setMyCommands([
-      {command: TelegramCommands.image, description: "Get the last image"},
+      {command: TelegramCommands.image, description: 'Get the last image'},
       {
         command: TelegramCommands.set_threshold,
-        description: "Sets new amount of pixels to be changes to fire a notification"
+        description: 'Sets new amount of pixels to be changes to fire a notification',
       },
       {
         command: TelegramCommands.increase_threshold,
-        description: "Double the amount of pixels related to current value to spot a diff"
+        description: 'Double the amount of pixels related to current value to spot a diff',
       },
       {
         command: TelegramCommands.decrease_threshold,
-        description: "Reduces the amount of pixels related to current value to spot a diff"
+        description: 'Reduces the amount of pixels related to current value to spot a diff',
       },
     ]);
-    this.bot.command(TelegramCommands.image, () => commandListener.onAskImage());
-    this.bot.command(TelegramCommands.set_threshold, (a: CommandContextExtn) => commandListener.onSetThreshold(a));
-    this.bot.command(TelegramCommands.increase_threshold, () => commandListener.onIncreaseThreshold());
-    this.bot.command(TelegramCommands.decrease_threshold, () => commandListener.onDecreaseThreshold());
+    this.bot.command(TelegramCommands.image, async() => commandListener.onAskImage());
+    this.bot.command(TelegramCommands.set_threshold, async(a: CommandContextExtn) => commandListener.onSetThreshold(a));
+    this.bot.command(TelegramCommands.increase_threshold, async() => commandListener.onIncreaseThreshold());
+    this.bot.command(TelegramCommands.decrease_threshold, async() => commandListener.onDecreaseThreshold());
     await this.bot.launch();
-  }
-
-  private async validateToken(): Promise<void> {
-    try {
-      const botInfo = await this.bot.telegram.getMe();
-      this.logger.log(`Telegram bot validated: @${botInfo.username} (${botInfo.first_name})`);
-    } catch (error) {
-      throw new Error('Telegram token validation failed. Please check your bot token.');
-    }
   }
 
   async sendText(text: string): Promise<void> {
@@ -70,11 +61,20 @@ export class TelegramService {
       return;
     }
     if (this.lastNotificationTime !== 0 && diffDate < this.tgConfig.spamDelay * 1000) {
-      this.logger.log(`Awaiting ${this.tgConfig.spamDelay}s before next notificaiton. ${Math.round(diffDate/ 1000)}s passed`);
-      return
+      this.logger.log(`Awaiting ${this.tgConfig.spamDelay}s before next notificaiton. ${Math.round(diffDate / 1000)}s passed`);
+      return;
     }
     await this.bot.telegram.sendPhoto(this.tgConfig.chatId, {source: data}, {caption: this.tgConfig.message});
     this.lastNotificationTime = newNotificationTime;
-    this.logger.log("Notification sent");
+    this.logger.log('Notification sent');
+  }
+
+  private async validateToken(): Promise<void> {
+    try {
+      const botInfo = await this.bot.telegram.getMe();
+      this.logger.log(`Telegram bot validated: @${botInfo.username} (${botInfo.first_name})`);
+    } catch (error) {
+      throw new Error('Telegram token validation failed. Please check your bot token.');
+    }
   }
 }

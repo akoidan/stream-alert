@@ -1,56 +1,75 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {aconfigSchema} from "@/config/config-zod-schema";
-import {FileConfigReader} from "@/config/file-config-reader.service";
-import prompts from 'prompts';
-import {promises as fs} from "fs";
-import {FieldsValidator} from "@/config/fields-validator";
+import {Inject, Injectable, Logger} from '@nestjs/common';
+import {aconfigSchema, Config} from '@/config/config-zod-schema';
+import prompts, {Choice, PromptObject, PromptType} from 'prompts';
+
+import {ZodObject, type ZodTypeAny} from 'zod';
+import {INativeModule, Native} from '@/native/native-model';
+import {Telegraf} from 'telegraf';
+import {Platform, TelegrafGet} from '@/config/config-resolve-model';
+
+type PromptResponse = Record<string, string | number | boolean>;
 
 @Injectable()
-export class PromptConfigReader extends FileConfigReader {
+export class PromptConfigReader {
+  private tGToken: string | null = null;
 
   constructor(
-    logger: Logger,
-    configsPath: string,
-    private readonly validator: FieldsValidator,
+    private readonly logger: Logger,
+    @Inject(Native)
+    private readonly native: INativeModule,
+    @Inject(Platform)
+    private readonly platform: NodeJS.Platform,
+    @Inject(TelegrafGet)
+    private readonly getTG: (s: string) => Telegraf,
   ) {
-    super(logger, configsPath)
   }
 
-  public async load(): Promise<boolean> {
-    const success = await super.load()
-    if (!success) {
-      await this.promptForConfiguration();
+  public async validateTgChat(value: string | number): Promise<boolean | string> {
+    if (!this.tGToken) {
+      throw new Error('Unexpected validation error');
+    }
+    const bot = this.getTG(this.tGToken!);
+    const tokenValid = await bot.telegram.getChat(value as number).then(() => true).catch(() => false);
+    if (!tokenValid) {
+      return 'ChatID not found';
     }
     return true;
   }
 
-  private async promptForConfiguration() {
+  public async validateTgToken(value: string): Promise<boolean | string> {
+    const bot = this.getTG(value);
+    const tokenValid = await bot.telegram.getMe().then(() => true).catch(() => false);
+    if (!tokenValid) {
+      return 'Invalid token';
+    }
+    this.tGToken = value;
+    return true;
+  }
+
+  public async load(): Promise<Config> {
     this.logger.log('\n🤖 First, create a Telegram bot:\n'
       + '  1. Open @BotFather in Telegram\n'
       + '  2. Send /newbot and follow the instructions\n'
       + '  3. Save the bot token for the next step\n');
 
-    const questions: any[] = [];
+    const questions: PromptObject[] = [];
 
-    this.addQuestions('', aconfigSchema, questions);
+    this.addQuestions('', aconfigSchema, questions, []);
 
     const responses = await prompts(questions);
 
     // Update the data with responses using recursive mapping
-    this.updateDataFromResponsesRecursive(responses);
-    this.logger.log(`Saving data to file ${this.confPath}`)
-    await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
+    return this.updateDataFromResponsesRecursive(responses);
   }
 
-  private addQuestions(prefix: string, schema: any, questions: any[], path: string[] = []): void {
-    const shape = schema.shape;
-
-    for (const [key, fieldSchema] of Object.entries(shape)) {
-      const zodField = fieldSchema as any;
+  private addQuestions(prefix: string, schema: ZodObject, questions: PromptObject[], path: string[]): void {
+    for (const [key, fieldSchema] of Object.entries(schema.shape)) {
+      const zodField = fieldSchema as ZodObject;
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
 
-      if (zodField._def.typeName === 'ZodObject' || zodField.shape !== undefined) {
+      // eslint-disable-next-line 
+      if ((zodField._def as any).typeName || zodField.shape !== undefined) {
         // Nested object - recurse with the nested schema
         this.addQuestions(prefix, zodField, questions, currentPath);
       } else {
@@ -61,96 +80,111 @@ export class PromptConfigReader extends FileConfigReader {
     }
   }
 
-  private createQuestion(fieldName: string, zodField: any): any {
-    const type = this.detectFieldType(zodField);
-    const description = zodField._def.description || fieldName;
-    const defaultValue = this.getDefaultValue(zodField);
-
-    const question: any = {
-      type,
-      name: fieldName,
-      message: description,
-      initial: defaultValue
-    };
-
-    // Add validation using Zod
-    question.validate = async (value: any) => {
-
-      const result = zodField.safeParse(value);
-      if (result.success) {
-        if (fieldName === 'telegram.chatId') {
-          return this.validator.validateTgChat(value);
-        } else if (fieldName === 'telegram.token') {
-          return this.validator.validateTgToken(value);
-        } else if (fieldName === "camera.name") {
-          return this.validator.validateCamera(value);
-        }
-        return true;
+  private createQuestion(fieldName: string, zodField: ZodTypeAny): PromptObject {
+    const descrp = this.unwrapZodField(zodField).description;
+    if (!descrp) {
+      throw Error(`${fieldName} doesnt have description`);
+    }
+    if (fieldName === 'camera.name') {
+      const cameras = this.native.listAvailableCameras();
+      if (cameras.length === 0) {
+        throw Error('Cannot find any cameras in the system');
       }
-      return result.error?.issues[0]?.message || 'Invalid value';
+      const choices: Choice[] = cameras.map(c => ({
+        title: c.name,
+        value: this.platform === 'linux' ? c.path : c.name,
+      }));
+      return {
+        type: 'select',
+        name: fieldName,
+        message: descrp,
+        choices,
+      };
+    }
+    return {
+      type: this.detectFieldType(zodField) as PromptType,
+      name: fieldName,
+      message: descrp,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      initial: (zodField as any).def.defaultValue,
+      validate: async(value: string | number | boolean): Promise<boolean | string> => {
+        const result = zodField.safeParse(value);
+        if (result.success) {
+          if (fieldName === 'telegram.chatId') {
+            return this.validateTgChat(value as string | number);
+          } else if (fieldName === 'telegram.token') {
+            return this.validateTgToken(value as string);
+          }
+          return true;
+        }
+        return result.error?.issues[0]?.message || 'Invalid value';
+      },
     };
-
-    return question;
   }
 
-  private detectFieldType(zodField: any): string {
+  // Add validation using Zod
+
+
+  private detectFieldType(zodField: ZodTypeAny): string {
     let type = 'text';
     const innerType = this.unwrapZodField(zodField);
 
-    if (innerType._def.type === 'number') {
+    // eslint-disable-next-line 
+    if ((innerType._def as any).type === 'number') {
       type = 'number';
-    } else if (innerType._def.type === 'boolean') {
+    // eslint-disable-next-line 
+    } else if ((innerType._def as any).type === 'boolean') {
       type = 'confirm';
     }
 
     return type;
   }
 
-  private unwrapZodField(zodField: any): any {
+  private unwrapZodField(zodField: ZodTypeAny): ZodTypeAny {
     let innerType = zodField;
+    // eslint-disable-next-line 
+    const def = innerType._def;
 
     // Unwrap ZodDefault if present (type: "default")
-    if (innerType._def.type === 'default') {
-      innerType = innerType._def.innerType;
+    if ((def as any).type === 'default') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/prefer-destructuring
+      innerType = (def as any).innerType;
     }
 
     // Unwrap ZodEffects if present (from .int(), .min(), etc.)
-    if (innerType._def.type === 'effect') {
-      innerType = innerType._def.schema;
+    // eslint-disable-next-line 
+    const innerDef = innerType._def;
+    if ((innerDef as any).typeName === 'ZodEffects') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/prefer-destructuring
+    innerType = (innerDef as any).innerType;
     }
 
     return innerType;
   }
 
-  private getDefaultValue(zodField: any): any {
-    if (zodField._def.type === 'default') {
-      try {
-        return zodField._def.defaultValue;
-      } catch {
-        return undefined;
-      }
-    }
-    return undefined;
-  }
-
-  private setNestedValue(obj: any, path: string[], value: any): void {
+  private setNestedValue(obj: Record<string, any>, path: string[], value: string | number | boolean): void {
     const lastKey = path.pop()!;
-    const target = path.reduce((current, key) => {
-      if (!current[key]) current[key] = {};
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const target = path.reduce((current: any, key) => {
+      if (!current[key]) {
+        current[key] = {};
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return current[key];
     }, obj);
     target[lastKey] = value;
   }
 
-
-  private updateDataFromResponsesRecursive(responses: any) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  private updateDataFromResponsesRecursive(responses: PromptResponse): Config {
     // Start with empty object
-    this.data = {} as any;
+    const data: Config = {} as Config;
 
     // Update with user responses
     for (const [fieldName, value] of Object.entries(responses)) {
       const path = fieldName.split('.'); // Split "telegram.token" -> ["telegram", "token"]
-      this.setNestedValue(this.data, path, value);
+      this.setNestedValue(data, path, value);
     }
+    return data;
   }
 }

@@ -3,7 +3,7 @@ const {resolve} = require('path');
 
 
 esbuild.build({
-  entryPoints: [resolve(__dirname, 'dist', 'sea.js')],
+  entryPoints: [resolve(__dirname, 'dist', 'main.js')],
   bundle: true,
   outfile: resolve(__dirname,  'dist', 'sea-bundle.js'),
   platform: 'node',

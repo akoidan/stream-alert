@@ -1,7 +1,7 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {FrameData, INativeModule, Native} from '@/native/native-model';
-import {DiffConfData} from "@/config/config-resolve-model";
-import {DiffConfig} from "@/config/config-zod-schema";
+import {DiffConfData} from '@/config/config-resolve-model';
+import {DiffConfig} from '@/config/config-zod-schema';
 
 @Injectable()
 export class ImagelibService {
@@ -21,11 +21,11 @@ export class ImagelibService {
       return null;
     }
 
-    return await this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
+    return this.native.convertRgbToJpeg(this.oldFrame.buffer, this.oldFrame.width, this.oldFrame.height);
   }
 
   async getImageIfItsChanged(frameData: FrameData): Promise<Buffer | null> {
-    if (!frameData || !frameData.buffer || frameData.buffer.length === 0) {
+    if (!frameData?.buffer || frameData.buffer.length === 0) {
       return null;
     }
 

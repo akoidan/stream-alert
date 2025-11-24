@@ -60,11 +60,27 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          package-manager-cache: false
           node-version: 24
-          cache: yarn
+
+      - uses: actions/cache@v4
+        id: cache-node
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
+
+      - name: Test Coverage
+        run: yarn jest
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: coverage/lcov.info
 
       - name: Build native .node modules
         run: yarn cmake
@@ -88,7 +104,6 @@ jobs:
           asset_name: app.elf
           asset_content_type: application/x-executable
 
-
   win32:
     needs: [ create_release ]
     runs-on: windows-2022
@@ -98,10 +113,17 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          package-manager-cache: false
           node-version: 24
-          cache: yarn
+
+      - uses: actions/cache@v4
+        id: cache-node
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Build native .node modules

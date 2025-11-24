@@ -1,42 +1,47 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {IConfigResolver} from "@/config/config-resolve-model";
-import {promises as fs} from "fs";
-import path from "path";
-import {CameraConfig, Config, aconfigSchema, DiffConfig, TelegramConfig} from "@/config/config-zod-schema";
+import {Inject, Injectable, Logger} from '@nestjs/common';
+import {promises as fs} from 'fs';
+import path from 'path';
+import {aconfigSchema, Config} from '@/config/config-zod-schema';
+import {ConfigPath} from '@/config/config-resolve-model';
 
 @Injectable()
-export class FileConfigReader implements IConfigResolver{
-  protected data: Config = null!;
+export class FileConfigReader {
+  public data: Config = null!;
+
   constructor(
     protected readonly logger: Logger,
+    @Inject(ConfigPath)
     protected readonly configsPath: string
   ) {
   }
 
-
-  protected get confPath():string {
+  protected get confPath(): string {
     return path.join(this.configsPath, 'stream-alert.json');
   };
 
-  public async load(): Promise<boolean> {
-    if (await fs.access(this.confPath).then(() => true).catch(() => false)) {
-      const data = await fs.readFile(this.confPath, 'utf8');
-      this.data = await aconfigSchema.parseAsync(JSON.parse(data));
-      return true;
-    } else {
-      return false
+
+  public async canHandle(): Promise<boolean> {
+    return fs.access(this.confPath).then(() => true).catch(() => false);
+  }
+
+  public save(data: Config): void {
+    this.data = data;
+    setTimeout(() => {
+      this.logger.log(`Saving data to file ${this.confPath}`);
+      fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2)).catch((e: unknown) => {
+        this.logger.error(`Unable to save config to file ${this.confPath}: \n ${(e as Error).message}`, (e as Error).stack);
+      });
+    }, 5000);
+  }
+
+  public async load(): Promise<void> {
+    const data = await fs.readFile(this.confPath, 'utf8');
+    try {
+      this.data = await aconfigSchema.parseAsync(JSON.parse(data)) as Config;
+    } catch (e) {
+      const err = new Error(`Unable to parse config at ${this.confPath}: \n ${(e as Error).message}`);
+      err.stack = (e as Error).stack;
+      throw err;
     }
-  }
-
-  public getTGConfig(): TelegramConfig {
-    return this.data.telegram;
-  }
-
-  public getDiffConfig(): DiffConfig {
-    return this.data.diff;
-  }
-
-  public getCameraConfig(): CameraConfig {
-    return this.data.camera;
   }
 }
