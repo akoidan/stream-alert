@@ -5,14 +5,14 @@ import * as os from "node:os";
 export const telegramSchema = z.object({
   token: z.string()
     .regex(/^\d{10}:[a-zA-Z0-9_-]{35}$/, 'Invalid token format (should be like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss')
-    .describe('🔑 Bot token from @BotFather - required for Telegram bot authentication'),
+    .describe('🔑 Bot token from @BotFather'),
   chatId: z.number()
     .int()
     .min(10001, 'Invalid Chat format')
-    .describe('💬 Your Telegram chat ID - get it from @userinfobot'),
+    .describe('💬 Your Telegram chat ID from @userinfobot'),
   spamDelay: z.number()
     .nonnegative('Delay must be non-negative')
-    .describe('⏱️ Delay between alerts in seconds - short delay will result in many notifications')
+    .describe('⏱️ Delay between alerts in seconds')
     .default(300),
   message: z.string()
     .min(1, 'Message cannot be empty')
@@ -27,11 +27,10 @@ export const telegramSchema = z.object({
 export const cameraSchema = z.object({
   name: z.string()
     .min(1, 'Camera name cannot be empty')
-    .describe('📹 Camera name (e.g., "OBS Virtual Camera" or your webcam)')
-    .default(process.platform === 'linux' ? '/dev/video0' : 'OBS Virtual Camera'),
+    .describe('📹 Camera name'),
   frameRate: z.number()
     .positive('Frame rate must be positive')
-    .describe('🎬 Frame rate in frames per second (recommended: 1-5)')
+    .describe('🎬 Frame rate in frames per second')
     .default(1),
 });
 

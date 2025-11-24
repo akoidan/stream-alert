@@ -1,7 +1,7 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {aconfigSchema, Config} from "@/config/config-zod-schema";
 import {FileConfigReader} from "@/config/file-config-reader.service";
-import prompts, {PromptObject, PromptType} from 'prompts';
+import prompts, {Choice, PromptObject, PromptType} from 'prompts';
 import {promises as fs} from "fs";
 
 import {ZodObject, type ZodTypeAny} from 'zod';
@@ -76,14 +76,16 @@ export class PromptConfigReader extends FileConfigReader {
 
     // Update the data with responses using recursive mapping
     this.updateDataFromResponsesRecursive(responses);
-    this.logger.log(`Saving data to file ${this.confPath}`)
-    await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
+    // save current file only if app is still alive in 5s
+    // otherwise prompt can be interrupted, and interruption with prompt still executes some code
+    setTimeout(async () => {
+      this.logger.log(`Saving data to file ${this.confPath}`)
+      await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
+    }, 5000);
   }
 
   private addQuestions(prefix: string, schema: ZodObject, questions: PromptObject[], path: string[]): void {
-    const shape = schema.shape;
-
-    for (const [key, fieldSchema] of Object.entries(shape)) {
+    for (const [key, fieldSchema] of Object.entries(schema.shape)) {
       const zodField = fieldSchema as ZodObject;
       const currentPath = [...path, key];
       const fieldName = currentPath.join('.'); // Use dot notation like "telegram.token"
@@ -100,29 +102,31 @@ export class PromptConfigReader extends FileConfigReader {
   }
 
   private createQuestion(fieldName: string, zodField: ZodTypeAny): PromptObject {
-
-    if (!(zodField._def as ZodTypeAny).description) {
+    const descrp = this.unwrapZodField(zodField).description;
+    if (!descrp) {
       throw Error(`${fieldName} doesnt have description`)
     }
     if (fieldName === 'camera.name') {
       const cameras = this.native.listAvailableCameras();
-
+      if (cameras.length === 0) {
+        throw Error(`Cannot find any cameras in the system`);
+      }
+      const choices: Choice[] = cameras.map(c => ({
+        title: c.name,
+        value: this.platform === 'linux' ? c.path : c.name
+      }));
       return {
         type: 'select',
         name: fieldName,
-        message: (zodField._def as ZodTypeAny).description,
-        choices: cameras.map(c => ({
-          title: c.name,
-          value: this.platform === 'linux' ? c.path : c.name
-        }))
+        message: descrp,
+        choices,
       }
     } else {
-      const defaultValue = this.getDefaultValue(zodField);
       return {
         type: this.detectFieldType(zodField) as PromptType,
         name: fieldName,
-        message: (zodField._def as any).description,
-        initial: defaultValue,
+        message: descrp,
+        initial: (zodField as any).def.defaultValue,
         validate: async (value: string | number | boolean) => {
           const result = zodField.safeParse(value);
           if (result.success) {
@@ -171,18 +175,6 @@ export class PromptConfigReader extends FileConfigReader {
     }
 
     return innerType;
-  }
-
-  private getDefaultValue(zodField: ZodTypeAny): string | number | boolean | undefined {
-    const def = zodField._def as any;
-    if (def.typeName === 'ZodDefault') {
-      try {
-        return def.defaultValue();
-      } catch {
-        return undefined;
-      }
-    }
-    return undefined;
   }
 
   private setNestedValue(obj: Record<string, any>, path: string[], value: string | number | boolean): void {

@@ -21,7 +21,13 @@ export class FileConfigReader implements IConfigResolver{
   public async load(): Promise<boolean> {
     if (await fs.access(this.confPath).then(() => true).catch(() => false)) {
       const data = await fs.readFile(this.confPath, 'utf8');
-      this.data = await aconfigSchema.parseAsync(JSON.parse(data));
+      try {
+        this.data = await aconfigSchema.parseAsync(JSON.parse(data));
+      } catch (e) {
+        const err = new Error(`Unable to parse config at ${this.confPath}: \n ${(e as Error).message}`);
+        err.stack = (e as Error).stack;
+        throw err;
+      }
       return true;
     } else {
       return false
