@@ -165,15 +165,34 @@ static map<string, string> GetAvailableCameras() {
                 continue;
             }
 
-            string namePath = string("/sys/class/video4linux/") + node + "/name";
-            ifstream nameFile(namePath);
-            string cameraName;
-            if (nameFile.good()) {
-                getline(nameFile, cameraName);
-                cameraName = Trim(cameraName);
-            }
+            // Check if this device supports video capture and has formats before adding it
+            int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                v4l2_capability cap = {};
+                if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
+                    // Only add devices that support video capture
+                    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
+                        // Also check if the device supports any video formats
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(fd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            // Device has at least one supported format
+                            string namePath = string("/sys/class/video4linux/") + node + "/name";
+                            ifstream nameFile(namePath);
+                            string cameraName;
+                            if (nameFile.good()) {
+                                getline(nameFile, cameraName);
+                                cameraName = Trim(cameraName);
+                            }
 
-            addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                            addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                        }
+                    }
+                }
+                close(fd);
+            }
         }
         closedir(dir);
 
@@ -184,11 +203,30 @@ static map<string, string> GetAvailableCameras() {
         LOG_LNX_ERR("Failed to open /sys/class/video4linux for enumeration");
     }
 
-    // Final fallback: probe /dev/video[0-63]
+    // Final fallback: probe /dev/video[0-63] with capability checking
     for (int index = 0; index < 64; ++index) {
         string devicePath = string("/dev/video") + to_string(index);
         if (access(devicePath.c_str(), F_OK) == 0) {
-            addCamera("Video Device " + to_string(index), devicePath);
+            // Check if this device supports video capture and has formats
+            int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                v4l2_capability cap = {};
+                if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
+                    // Only add devices that support video capture
+                    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
+                        // Also check if the device supports any video formats
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(fd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            // Device has at least one supported format
+                            addCamera("Video Device " + to_string(index), devicePath);
+                        }
+                    }
+                }
+                close(fd);
+            }
         }
     }
 
@@ -231,6 +269,37 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
         // If still not found, try to use the input as a direct path
         if (devicePath.empty()) {
             devicePath = deviceName;
+            LOG_LNX("Device not found in camera list, trying direct path: " << devicePath);
+            
+            // If direct path also fails validation, use the first available camera
+            if (access(devicePath.c_str(), F_OK) != 0 || !cameras.empty()) {
+                // Check if the direct path device supports video capture and formats
+                bool directPathValid = false;
+                if (access(devicePath.c_str(), F_OK) == 0) {
+                    int testFd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+                    if (testFd >= 0) {
+                        v4l2_capability cap = {};
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(testFd, VIDIOC_QUERYCAP, &cap) == 0 &&
+                            (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) &&
+                            ioctl(testFd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            directPathValid = true;
+                        }
+                        close(testFd);
+                    }
+                }
+                
+                // If direct path is not valid and we have available cameras, use the first one
+                if (!directPathValid && !cameras.empty()) {
+                    auto firstCamera = cameras.begin();
+                    devicePath = firstCamera->second;
+                    LOG_LNX("Direct path invalid, falling back to first available camera: " 
+                           << firstCamera->first << " -> " << devicePath);
+                }
+            }
         }
     }
 
@@ -244,19 +313,41 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
         LOG_LNX_ERR("Failed to open device " << devicePath << ": " << strerror(err));
         ThrowSystemError("Failed to open device " + devicePath, err);
     }
+
+    LOG_LNX("Successfully opened device: " << devicePath);
+
+    // Verify this is a video capture device by checking capabilities
+    v4l2_capability cap = {};
+    if (xioctl(fd_, VIDIOC_QUERYCAP, &cap) == -1) {
+        int err = errno;
+        LOG_LNX_ERR("Failed to query device capabilities: " << strerror(err));
+        close(fd_);
+        fd_ = -1;
+        ThrowSystemError("Failed to query device capabilities", err);
+    }
+
+    LOG_LNX("Device capabilities: " << cap.driver << " " << cap.card);
+    LOG_LNX("Device capabilities flags: 0x" << std::hex << cap.capabilities);
+
+    // Check if device supports video capture
+    if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
+        LOG_LNX_ERR("Device does not support video capture");
+        close(fd_);
+        fd_ = -1;
+        ThrowError("Device does not support video capture");
+    }
 }
 
 void LinuxCapture::StartCapture(int width, int height, int fps) {
-    LOG_LNX("Starting capture with resolution: " << width << "x" << height << " at " << fps << "fps");
+    LOG_LNX("Starting capture (will use camera's preferred resolution) at " << fps << "fps");
 
     if (isCapturing_) {
         LOG_LNX("Already capturing, stopping first...");
         StopCapture();
     }
 
-    width_ = width;
-    height_ = height;
     fps_ = fps;
+    // width_ and height_ will be set by InitDevice based on camera's actual format
 
     InitDevice(width, height, fps);
 
@@ -277,46 +368,29 @@ void LinuxCapture::StopCapture() {
 }
 
 void LinuxCapture::InitDevice(int width, int height, int fps) {
-    LOG_LNX("Initializing device with resolution: " << width << "x" << height);
+    LOG_LNX("Initializing device (using camera's preferred format and resolution)");
 
-    // First, get the current format to see what's supported
+    // Get the camera's current/default format without trying to change it
     v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
         int err = errno;
         LOG_LNX_ERR("Failed to get current format: " << strerror(err));
-        ThrowSystemError("Failed to get current format", err);
+        LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
+        LOG_LNX_ERR("This usually means the device doesn't support video capture or is not a valid V4L2 device");
+        ThrowSystemError("Failed to get current format from device " + deviceName_, err);
     }
 
-    LOG_LNX("Current format: "
+    LOG_LNX("Camera's default format: "
             << (char)(fmt.fmt.pix.pixelformat & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 8) & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 16) & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 24) & 0xFF)
             << " (" << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << ")");
 
-    // Try to set the requested format
-    fmt.fmt.pix.width = width;
-    fmt.fmt.pix.height = height;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;  // Prefer MJPEG
-    fmt.fmt.pix.field = V4L2_FIELD_ANY;
-
-    LOG_LNX("Requesting format: MJPEG " << width << "x" << height);
-    if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-        int err = errno;
-        LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(err));
-
-        // Fall back to YUYV
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-        LOG_LNX("Falling back to YUYV format");
-
-        if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-            int fallbackErr = errno;
-            LOG_LNX_ERR("Failed to set YUYV format: " << strerror(fallbackErr));
-            ThrowSystemError("Failed to configure capture format", fallbackErr);
-        }
-    }
+    // Use the camera's default format and resolution - no changes needed
+    LOG_LNX("Using camera's default format and resolution");
 
     // Check what format we actually got
     LOG_LNX("Set format to: "
@@ -327,6 +401,12 @@ void LinuxCapture::InitDevice(int width, int height, int fps) {
             << " (" << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << ")");
 
     pixelFormat_ = fmt.fmt.pix.pixelformat;
+    
+    // Update dimensions to actual values returned by the camera
+    width_ = static_cast<int>(fmt.fmt.pix.width);
+    height_ = static_cast<int>(fmt.fmt.pix.height);
+    
+    LOG_LNX("Updated dimensions to actual camera format: " << width_ << "x" << height_);
 
     // Set frame rate
     v4l2_streamparm parm = {};
@@ -595,6 +675,51 @@ FrameData* LinuxCapture::GetFrame() {
         jpeg_destroy_decompress(&cinfo);
 
         frame->dataSize = frame->buffer.size();
+    } else if (pixelFormat_ == V4L2_PIX_FMT_GREY) {
+        // Convert GREY (grayscale) to RGB
+        size_t expectedSize = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3;
+        frame->buffer.resize(expectedSize);
+        const uint8_t* src = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        uint8_t* dst = frame->buffer.data();
+
+        for (int i = 0; i < width_ * height_; ++i) {
+            uint8_t greyValue = src[i];
+            dst[i * 3 + 0] = greyValue; // R
+            dst[i * 3 + 1] = greyValue; // G
+            dst[i * 3 + 2] = greyValue; // B
+        }
+
+        frame->dataSize = frame->buffer.size();
+    } else if (pixelFormat_ == V4L2_PIX_FMT_NV12) {
+        // Convert NV12 to RGB
+        size_t expectedSize = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3;
+        frame->buffer.resize(expectedSize);
+        const uint8_t* src = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        uint8_t* dst = frame->buffer.data();
+
+        // NV12 format: Y plane followed by interleaved UV plane
+        const uint8_t* yPlane = src;
+        const uint8_t* uvPlane = src + (width_ * height_);
+
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                int yIndex = y * width_ + x;
+                int uvIndex = (y / 2) * width_ + (x & ~1);
+                
+                uint8_t yValue = yPlane[yIndex];
+                uint8_t uValue = uvPlane[uvIndex];
+                uint8_t vValue = uvPlane[uvIndex + 1];
+
+                auto rgb = YuvToRgb(yValue, uValue, vValue);
+
+                size_t rgbIndex = yIndex * 3;
+                dst[rgbIndex + 0] = rgb[0]; // R
+                dst[rgbIndex + 1] = rgb[1]; // G
+                dst[rgbIndex + 2] = rgb[2]; // B
+            }
+        }
+
+        frame->dataSize = frame->buffer.size();
     } else {
         // Unknown format, copy raw data as-is
         frame->buffer.resize(buf.bytesused);
@@ -678,8 +803,8 @@ namespace Capture {
             g_capture->OpenDevice(deviceName);
             LOG_LNX("Successfully opened device: " << g_capture->GetDeviceName());
 
-            // Start capture with default resolution
-            g_capture->StartCapture(640, 480, frameRate);
+            // Start capture with camera's preferred resolution
+            g_capture->StartCapture(0, 0, frameRate);
         } catch (const Napi::Error& error) {
             g_isCapturing = false;
             g_capture.reset();
