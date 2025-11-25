@@ -24,14 +24,10 @@ export class FileConfigReader {
     return fs.access(this.confPath).then(() => true).catch(() => false);
   }
 
-  public save(data: Config): void {
+  public async save(data: Config): Promise<void> {
     this.data = data;
-    setTimeout(() => {
-      this.logger.log(`Saving data to file ${this.confPath}`);
-      fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2)).catch((e: unknown) => {
-        this.logger.error(`Unable to save config to file ${this.confPath}: \n ${(e as Error).message}`, (e as Error).stack);
-      });
-    }, 5000);
+    this.logger.log(`Saving data to file ${this.confPath}`);
+    await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
   }
 
   public async load(): Promise<void> {

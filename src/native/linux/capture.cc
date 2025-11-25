@@ -165,15 +165,26 @@ static map<string, string> GetAvailableCameras() {
                 continue;
             }
 
-            string namePath = string("/sys/class/video4linux/") + node + "/name";
-            ifstream nameFile(namePath);
-            string cameraName;
-            if (nameFile.good()) {
-                getline(nameFile, cameraName);
-                cameraName = Trim(cameraName);
-            }
+            // Check if this device supports video capture before adding it
+            int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                v4l2_capability cap = {};
+                if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
+                    // Only add devices that support video capture
+                    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
+                        string namePath = string("/sys/class/video4linux/") + node + "/name";
+                        ifstream nameFile(namePath);
+                        string cameraName;
+                        if (nameFile.good()) {
+                            getline(nameFile, cameraName);
+                            cameraName = Trim(cameraName);
+                        }
 
-            addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                        addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                    }
+                }
+                close(fd);
+            }
         }
         closedir(dir);
 
@@ -184,11 +195,22 @@ static map<string, string> GetAvailableCameras() {
         LOG_LNX_ERR("Failed to open /sys/class/video4linux for enumeration");
     }
 
-    // Final fallback: probe /dev/video[0-63]
+    // Final fallback: probe /dev/video[0-63] with capability checking
     for (int index = 0; index < 64; ++index) {
         string devicePath = string("/dev/video") + to_string(index);
         if (access(devicePath.c_str(), F_OK) == 0) {
-            addCamera("Video Device " + to_string(index), devicePath);
+            // Check if this device supports video capture
+            int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+            if (fd >= 0) {
+                v4l2_capability cap = {};
+                if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
+                    // Only add devices that support video capture
+                    if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
+                        addCamera("Video Device " + to_string(index), devicePath);
+                    }
+                }
+                close(fd);
+            }
         }
     }
 
@@ -244,6 +266,29 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
         LOG_LNX_ERR("Failed to open device " << devicePath << ": " << strerror(err));
         ThrowSystemError("Failed to open device " + devicePath, err);
     }
+
+    LOG_LNX("Successfully opened device: " << devicePath);
+
+    // Verify this is a video capture device by checking capabilities
+    v4l2_capability cap = {};
+    if (xioctl(fd_, VIDIOC_QUERYCAP, &cap) == -1) {
+        int err = errno;
+        LOG_LNX_ERR("Failed to query device capabilities: " << strerror(err));
+        close(fd_);
+        fd_ = -1;
+        ThrowSystemError("Failed to query device capabilities", err);
+    }
+
+    LOG_LNX("Device capabilities: " << cap.driver << " " << cap.card);
+    LOG_LNX("Device capabilities flags: 0x" << std::hex << cap.capabilities);
+
+    // Check if device supports video capture
+    if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
+        LOG_LNX_ERR("Device does not support video capture");
+        close(fd_);
+        fd_ = -1;
+        ThrowError("Device does not support video capture");
+    }
 }
 
 void LinuxCapture::StartCapture(int width, int height, int fps) {
@@ -286,7 +331,9 @@ void LinuxCapture::InitDevice(int width, int height, int fps) {
     if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
         int err = errno;
         LOG_LNX_ERR("Failed to get current format: " << strerror(err));
-        ThrowSystemError("Failed to get current format", err);
+        LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
+        LOG_LNX_ERR("This usually means the device doesn't support video capture or is not a valid V4L2 device");
+        ThrowSystemError("Failed to get current format from device " + deviceName_, err);
     }
 
     LOG_LNX("Camera's default format: "

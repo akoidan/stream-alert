@@ -43,7 +43,7 @@ import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-
           await fr.load();
         } else {
           const data = await cr.load();
-          fr.save(data);
+          await fr.save(data);
         }
         return fr.data;
       },
