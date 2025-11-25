@@ -7,17 +7,18 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 import {createRequire} from 'node:module';
+import {writeFile} from "node:fs/promises";
 
 @Module({
   providers: [
     Logger,
     {
       provide: Native,
-      useFactory: (): INativeModule => {
+      useFactory: async (): Promise<INativeModule> => {
         if (isSea()) {
           const tmp = mkdtempSync(join(tmpdir(), 'sea-'));
           const pathOnDisk = join(tmp, 'native.node');
-          writeFileSync(pathOnDisk, Buffer.from(getAsset('native')));
+          await writeFile(pathOnDisk, Buffer.from(getAsset('native')));
           const requireFromHere = createRequire(__filename);
           // eslint-disable-next-line
           return requireFromHere(pathOnDisk) as INativeModule;
