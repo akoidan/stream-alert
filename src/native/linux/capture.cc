@@ -690,6 +690,36 @@ FrameData* LinuxCapture::GetFrame() {
         }
 
         frame->dataSize = frame->buffer.size();
+    } else if (pixelFormat_ == V4L2_PIX_FMT_NV12) {
+        // Convert NV12 to RGB
+        size_t expectedSize = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3;
+        frame->buffer.resize(expectedSize);
+        const uint8_t* src = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        uint8_t* dst = frame->buffer.data();
+
+        // NV12 format: Y plane followed by interleaved UV plane
+        const uint8_t* yPlane = src;
+        const uint8_t* uvPlane = src + (width_ * height_);
+
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                int yIndex = y * width_ + x;
+                int uvIndex = (y / 2) * width_ + (x & ~1);
+                
+                uint8_t yValue = yPlane[yIndex];
+                uint8_t uValue = uvPlane[uvIndex];
+                uint8_t vValue = uvPlane[uvIndex + 1];
+
+                auto rgb = YuvToRgb(yValue, uValue, vValue);
+
+                size_t rgbIndex = yIndex * 3;
+                dst[rgbIndex + 0] = rgb[0]; // R
+                dst[rgbIndex + 1] = rgb[1]; // G
+                dst[rgbIndex + 2] = rgb[2]; // B
+            }
+        }
+
+        frame->dataSize = frame->buffer.size();
     } else {
         // Unknown format, copy raw data as-is
         frame->buffer.resize(buf.bytesused);
