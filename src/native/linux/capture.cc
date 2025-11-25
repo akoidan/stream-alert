@@ -144,40 +144,9 @@ static map<string, string> GetAvailableCameras() {
         cameras[uniqueName] = devicePath;
     };
 
-    // Execute v4l2-ctl command to list devices
-    FILE* pipe = popen("v4l2-ctl --list-devices 2>&1", "r");
-    if (!pipe) {
-        LOG_LNX_ERR("Failed to execute v4l2-ctl");
-    } else {
-        char buffer[256];
-        string currentName;
+    // Use native system calls instead of external v4l2-ctl command
 
-        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-            string line(buffer);
-            if (!line.empty() && line.back() == '\n') {
-                line.pop_back();
-            }
-
-            string trimmedLine = Trim(line);
-            if (trimmedLine.empty()) {
-                continue;
-            }
-
-            if (trimmedLine.find(':') != string::npos) {
-                currentName = Trim(trimmedLine.substr(0, trimmedLine.find(':')));
-            } else if (trimmedLine.rfind("/dev/video", 0) == 0) {
-                addCamera(currentName, trimmedLine);
-            }
-        }
-
-        pclose(pipe);
-
-        if (!cameras.empty()) {
-            return cameras;
-        }
-    }
-
-    // Fallback: enumerate /sys/class/video4linux
+    // Enumerate /sys/class/video4linux to discover video devices
     DIR* dir = opendir("/sys/class/video4linux");
     if (dir != nullptr) {
         struct dirent* entry;

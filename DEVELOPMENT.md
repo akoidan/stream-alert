@@ -31,8 +31,10 @@ For screen capture, you need OBS with virtual camera feature:
    - Right-click on dark area > `Preview scaling`
 5. Specify `OBS Virtual Camera` in `stream-alert.json` at path `camera.name`
 
-### Development Tools
+## Development Tools
 
+
+### Windows
 #### Microsoft Visual C++
 - Install [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
   - If you installed Node.js with the installer, you can install these when prompted
@@ -46,6 +48,18 @@ For screen capture, you need OBS with virtual camera feature:
 - Node version 20 or [nvm](https://github.com/nvm-sh/nvm)
 - Install [yarn](https://yarnpkg.com/) to manage dependencies
 
+
+## Linux
+Required packages:
+ - v4l-utils 
+ - libjpeg-turbo
+ - cmake 
+ - make 
+ - yarn 
+ - ninja 
+ - nvm 
+ - g++ 
+ 
 ## Configuration
 
 Config file is located at `stream-alert.json`, or you can use `src/config/user/[username].json` which is in gitignore.
