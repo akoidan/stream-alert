@@ -29,6 +29,9 @@ elseif(UNIX AND NOT APPLE)
         message(STATUS " Alpine: sudo apk add v4l-utils-dev libjpeg-turbo-dev")
         message(FATAL_ERROR "Required V4L2 libraries not found")
     endif()
+    
+    # Create the imported target for linking
+    pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
     add_definitions(-D_LINUX)
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
     # expands to:  -lv4l2 -lv4lconvert -ljpeg -ldl -pthread -lm -lrt
