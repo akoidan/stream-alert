@@ -2,22 +2,22 @@ import {Inject, Logger, Module, OnModuleInit} from '@nestjs/common';
 import {INativeModule, Native} from '@/native/native-model';
 import clc from 'cli-color';
 import {getAsset, isSea} from 'node:sea';
-import {mkdtempSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 
 import {createRequire} from 'node:module';
+import {writeFile, mkdtemp} from 'node:fs/promises';
 
 @Module({
   providers: [
     Logger,
     {
       provide: Native,
-      useFactory: (): INativeModule => {
+      useFactory: async(): Promise<INativeModule> => {
         if (isSea()) {
-          const tmp = mkdtempSync(join(tmpdir(), 'sea-'));
+          const tmp = await mkdtemp(join(tmpdir(), 'sea-'));
           const pathOnDisk = join(tmp, 'native.node');
-          writeFileSync(pathOnDisk, Buffer.from(getAsset('native')));
+          await writeFile(pathOnDisk, Buffer.from(getAsset('native')));
           const requireFromHere = createRequire(__filename);
           // eslint-disable-next-line
           return requireFromHere(pathOnDisk) as INativeModule;

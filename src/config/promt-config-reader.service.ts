@@ -57,7 +57,7 @@ export class PromptConfigReader {
     this.addQuestions('', aconfigSchema, questions, []);
 
     const responses = await prompts(questions);
-    if (questions.length !== responses.length) {
+    if (questions.length !== Object.keys(responses).length) {
       throw Error('Not all questions were answered');
     }
 

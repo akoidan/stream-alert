@@ -26,6 +26,9 @@ Use your built-in or USB webcam directly.
 2. Launch OBS and capture the window/screen you want to monitor
 3. Click `Start Virtual Camera`
 
+## Linux
+`libjpeg` and `v4l-utils` are required to be installed on Linux systems.
+
 ## How It Works
 
 The app monitors your camera feed and sends Telegram alerts when:
