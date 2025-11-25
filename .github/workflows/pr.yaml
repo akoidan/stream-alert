@@ -54,7 +54,13 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Nest
         run: yarn nest
-  jest:
+
+      - name: Bundle everything to a single file
+        run: yarn esbuild
+
+      - name: Create a windows executable
+        run: yarn native
+  test:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -81,17 +87,6 @@ jobs:
     permissions: write-all
     steps:
       - uses: actions/checkout@v4
-
-      - name: Restore Cache APT Packages
-        # DO not create cache for PRs, since they are not accessible withing different PRs
-        # Only restore them
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives
-          # Should use cache from build.yaml rather than pr.yaml as it was used for create
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yaml') }}
-          restore-keys: |
-            apt-cache-${{ runner.os }}-
 
       - name: Install dependencies
         run: |
@@ -138,3 +133,11 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Cmake
         run: yarn cmake
+      - name: Nest
+        run: yarn nest
+
+      - name: Bundle everything to a single file
+        run: yarn esbuild
+
+      - name: Create a windows executable
+        run: yarn native

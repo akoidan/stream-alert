@@ -45,16 +45,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache APT Packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: apt-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build.yaml') }}
-          restore-keys: |
-            apt-cache-${{ runner.os }}-
-
       - name: Install dependencies
         run: |
           sudo apt-get update

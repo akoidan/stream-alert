@@ -27,9 +27,12 @@ jest.mock('telegraf', () => {
 // Mock prompts library
 jest.mock('prompts', () => {
   return jest.fn().mockResolvedValue({
-    'telegram.token': 'mock-telegram-token',
+    'telegram.token': '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz08assdfss',
     'telegram.chatId': 123456789,
-    'camera.deviceName': 'Mock Camera',
+    'telegram.spamDelay': 300,
+    'telegram.message': 'Changes detected',
+    'telegram.initialDelay': 10,
+    'camera.name': 'Mock Camera',
     'camera.frameRate': 30,
     'diff.pixels': 1000,
     'diff.threshold': 0.1,
@@ -93,7 +96,9 @@ describe('AppModule Functional Test', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   it('should call onModuleInit and run successfully', async () => {
