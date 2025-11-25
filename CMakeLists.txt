@@ -30,12 +30,19 @@ elseif(UNIX AND NOT APPLE)
         message(FATAL_ERROR "Required V4L2 libraries not found")
     endif()
     
+    # Find JPEG library explicitly
+    find_package(JPEG REQUIRED)
+    if(NOT JPEG_FOUND)
+        message(FATAL_ERROR "JPEG library not found")
+    endif()
+    include_directories(${JPEG_INCLUDE_DIR})
+    
     # Create the imported target for linking
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
     add_definitions(-D_LINUX)
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
     # expands to:  -lv4l2 -lv4lconvert -ljpeg -ldl -pthread -lm -lrt
-    set(LIBS ${CMAKE_JS_LIB} PkgConfig::V4L2)
+    set(LIBS ${CMAKE_JS_LIB} PkgConfig::V4L2 ${JPEG_LIBRARIES})
 else()
     message(FATAL_ERROR "Unsupported OS")
 endif()

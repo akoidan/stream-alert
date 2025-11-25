@@ -1,6 +1,7 @@
 FROM node:24-alpine
 
-# Install basic build tools but NOT v4l libraries (to test error message)
+
+# Install basic build tools and runtime libraries
 RUN apk add --no-cache \
     build-base \
     cmake \
@@ -13,7 +14,9 @@ RUN apk add --no-cache \
     git \
     linux-headers \
     libjpeg-turbo-dev \
-    v4l-utils-dev
+    libjpeg-turbo \
+    v4l-utils-dev \
+    v4l-utils
 
 # Create app directory
 WORKDIR /app
@@ -23,6 +26,4 @@ COPY . .
 
 # Install Node.js dependencies
 RUN yarn install
-
-# Try to build (should fail with our helpful error message)
-CMD ["yarn", "cmake"]
+RUN yarn cmake
