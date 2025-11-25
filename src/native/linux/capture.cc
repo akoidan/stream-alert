@@ -277,9 +277,9 @@ void LinuxCapture::StopCapture() {
 }
 
 void LinuxCapture::InitDevice(int width, int height, int fps) {
-    LOG_LNX("Initializing device with resolution: " << width << "x" << height);
+    LOG_LNX("Initializing device (will use camera's default resolution)");
 
-    // First, get the current format to see what's supported
+    // Get the current/default format from the camera
     v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -289,34 +289,15 @@ void LinuxCapture::InitDevice(int width, int height, int fps) {
         ThrowSystemError("Failed to get current format", err);
     }
 
-    LOG_LNX("Current format: "
+    LOG_LNX("Camera's default format: "
             << (char)(fmt.fmt.pix.pixelformat & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 8) & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 16) & 0xFF)
             << (char)((fmt.fmt.pix.pixelformat >> 24) & 0xFF)
             << " (" << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << ")");
 
-    // Try to set the requested format
-    fmt.fmt.pix.width = width;
-    fmt.fmt.pix.height = height;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;  // Prefer MJPEG
-    fmt.fmt.pix.field = V4L2_FIELD_ANY;
-
-    LOG_LNX("Requesting format: MJPEG " << width << "x" << height);
-    if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-        int err = errno;
-        LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(err));
-
-        // Fall back to YUYV
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-        LOG_LNX("Falling back to YUYV format");
-
-        if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-            int fallbackErr = errno;
-            LOG_LNX_ERR("Failed to set YUYV format: " << strerror(fallbackErr));
-            ThrowSystemError("Failed to configure capture format", fallbackErr);
-        }
-    }
+    // Use the camera's default format and resolution - no changes needed
+    LOG_LNX("Using camera's default format and resolution");
 
     // Check what format we actually got
     LOG_LNX("Set format to: "
@@ -327,6 +308,12 @@ void LinuxCapture::InitDevice(int width, int height, int fps) {
             << " (" << fmt.fmt.pix.width << "x" << fmt.fmt.pix.height << ")");
 
     pixelFormat_ = fmt.fmt.pix.pixelformat;
+    
+    // Update dimensions to actual values returned by the camera
+    width_ = static_cast<int>(fmt.fmt.pix.width);
+    height_ = static_cast<int>(fmt.fmt.pix.height);
+    
+    LOG_LNX("Updated dimensions to actual camera format: " << width_ << "x" << height_);
 
     // Set frame rate
     v4l2_streamparm parm = {};
@@ -593,6 +580,21 @@ FrameData* LinuxCapture::GetFrame() {
 
         jpeg_finish_decompress(&cinfo);
         jpeg_destroy_decompress(&cinfo);
+
+        frame->dataSize = frame->buffer.size();
+    } else if (pixelFormat_ == V4L2_PIX_FMT_GREY) {
+        // Convert GREY (grayscale) to RGB
+        size_t expectedSize = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3;
+        frame->buffer.resize(expectedSize);
+        const uint8_t* src = static_cast<uint8_t*>(buffers_[buf.index]->start);
+        uint8_t* dst = frame->buffer.data();
+
+        for (int i = 0; i < width_ * height_; ++i) {
+            uint8_t greyValue = src[i];
+            dst[i * 3 + 0] = greyValue; // R
+            dst[i * 3 + 1] = greyValue; // G
+            dst[i * 3 + 2] = greyValue; // B
+        }
 
         frame->dataSize = frame->buffer.size();
     } else {
