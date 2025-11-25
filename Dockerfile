@@ -10,7 +10,10 @@ RUN apk add --no-cache \
     make \
     yarn \
     g++ \
-    git
+    git \
+    linux-headers \
+    libjpeg-turbo-dev \
+    v4l-utils-dev
 
 # Create app directory
 WORKDIR /app
