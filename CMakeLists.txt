@@ -20,25 +20,13 @@ if(WIN32)
 elseif(UNIX AND NOT APPLE)
     include_directories(${CMAKE_SOURCE_DIR}/src/native/linux/headers)
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(V4L2 libv4l2)
-    if(NOT V4L2_FOUND)
-        message(STATUS "V4L2 libraries not found. Please install development packages:")
-        message(STATUS " Ubuntu/Debian: sudo apt-get install libv4l-dev libjpeg-dev linux-libc-dev")
-        message(STATUS " Arch Linux: sudo pacman -S v4l-utils libjpeg-turbo linux-headers")
-        message(STATUS " CentOS/RHEL: sudo dnf install libv4l-devel libjpeg-turbo-devel kernel-headers")
-        message(STATUS " Alpine: sudo apk add v4l-utils-dev libjpeg-turbo-dev linux-headers")
-        message(FATAL_ERROR "Required V4L2 libraries not found")
-    endif()
-    
-    # Find JPEG library explicitly
-    find_package(JPEG REQUIRED)
-    if(NOT JPEG_FOUND)
-        message(FATAL_ERROR "JPEG library not found")
-    endif()
-    include_directories(${JPEG_INCLUDE_DIR})
-    
-    # Create the imported target for linking
     pkg_check_modules(V4L2 REQUIRED IMPORTED_TARGET libv4l2)
+    find_package(JPEG REQUIRED)
+    if(NOT V4L2_FOUND OR NOT JPEG_FOUND)
+        message(FATAL_ERROR "Required V4L2 Jpeg not found, check Dockerfile for dependencies")
+    endif()
+
+    include_directories(${JPEG_INCLUDE_DIR})
     add_definitions(-D_LINUX)
     file(GLOB_RECURSE CC_FILES "${CMAKE_SOURCE_DIR}/src/native/linux/*.cc")
     # expands to:  -lv4l2 -lv4lconvert -ljpeg -ldl -pthread -lm -lrt
