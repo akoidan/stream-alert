@@ -339,16 +339,15 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
 }
 
 void LinuxCapture::StartCapture(int width, int height, int fps) {
-    LOG_LNX("Starting capture with resolution: " << width << "x" << height << " at " << fps << "fps");
+    LOG_LNX("Starting capture (will use camera's preferred resolution) at " << fps << "fps");
 
     if (isCapturing_) {
         LOG_LNX("Already capturing, stopping first...");
         StopCapture();
     }
 
-    width_ = width;
-    height_ = height;
     fps_ = fps;
+    // width_ and height_ will be set by InitDevice based on camera's actual format
 
     InitDevice(width, height, fps);
 
@@ -369,37 +368,18 @@ void LinuxCapture::StopCapture() {
 }
 
 void LinuxCapture::InitDevice(int width, int height, int fps) {
-    LOG_LNX("Initializing device (will try to set a reasonable format)");
+    LOG_LNX("Initializing device (using camera's preferred format and resolution)");
 
-    // Try to set a reasonable format first, then query what we got
+    // Get the camera's current/default format without trying to change it
     v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = 640;
-    fmt.fmt.pix.height = 480;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;  // Most widely supported format
-    fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
-    LOG_LNX("Trying to set format: YUYV 640x480");
-    if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
+    if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
         int err = errno;
-        LOG_LNX_ERR("Failed to set YUYV format: " << strerror(err));
-        
-        // Try MJPEG as fallback
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-        LOG_LNX("Trying fallback format: MJPEG 640x480");
-        if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
-            int mjpegErr = errno;
-            LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(mjpegErr));
-            
-            // Final fallback: try to get current format
-            LOG_LNX("Trying to get current format as last resort");
-            if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
-                int getFmtErr = errno;
-                LOG_LNX_ERR("Failed to get current format: " << strerror(getFmtErr));
-                LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
-                ThrowSystemError("Failed to configure any format on device " + deviceName_, getFmtErr);
-            }
-        }
+        LOG_LNX_ERR("Failed to get current format: " << strerror(err));
+        LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
+        LOG_LNX_ERR("This usually means the device doesn't support video capture or is not a valid V4L2 device");
+        ThrowSystemError("Failed to get current format from device " + deviceName_, err);
     }
 
     LOG_LNX("Camera's default format: "
@@ -793,8 +773,8 @@ namespace Capture {
             g_capture->OpenDevice(deviceName);
             LOG_LNX("Successfully opened device: " << g_capture->GetDeviceName());
 
-            // Start capture with default resolution
-            g_capture->StartCapture(640, 480, frameRate);
+            // Start capture with camera's preferred resolution
+            g_capture->StartCapture(0, 0, frameRate);
         } catch (const Napi::Error& error) {
             g_isCapturing = false;
             g_capture.reset();
