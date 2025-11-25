@@ -33,33 +33,7 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Lint
         run: yarn lint
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v6
-        with:
-          package-manager-cache: false
-          node-version: 24
-      - name: Restore node_modules cache
-        id: cache-node
-        # DO not create cache for PRs, since they are not accessible withing different PRs
-        # Only restore them
-        uses: actions/cache/restore@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
-      - name: Install yarn deps
-        if: steps.cache-node.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-      - name: Nest
-        run: yarn nest
 
-      - name: Bundle everything to a single file
-        run: yarn esbuild
-
-      - name: Create a windows executable
-        run: yarn native
   test:
     runs-on: ubuntu-22.04
     steps:
