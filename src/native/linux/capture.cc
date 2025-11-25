@@ -165,22 +165,30 @@ static map<string, string> GetAvailableCameras() {
                 continue;
             }
 
-            // Check if this device supports video capture before adding it
+            // Check if this device supports video capture and has formats before adding it
             int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
             if (fd >= 0) {
                 v4l2_capability cap = {};
                 if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
                     // Only add devices that support video capture
                     if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
-                        string namePath = string("/sys/class/video4linux/") + node + "/name";
-                        ifstream nameFile(namePath);
-                        string cameraName;
-                        if (nameFile.good()) {
-                            getline(nameFile, cameraName);
-                            cameraName = Trim(cameraName);
-                        }
+                        // Also check if the device supports any video formats
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(fd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            // Device has at least one supported format
+                            string namePath = string("/sys/class/video4linux/") + node + "/name";
+                            ifstream nameFile(namePath);
+                            string cameraName;
+                            if (nameFile.good()) {
+                                getline(nameFile, cameraName);
+                                cameraName = Trim(cameraName);
+                            }
 
-                        addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                            addCamera(cameraName.empty() ? devicePath : cameraName, devicePath);
+                        }
                     }
                 }
                 close(fd);
@@ -199,14 +207,22 @@ static map<string, string> GetAvailableCameras() {
     for (int index = 0; index < 64; ++index) {
         string devicePath = string("/dev/video") + to_string(index);
         if (access(devicePath.c_str(), F_OK) == 0) {
-            // Check if this device supports video capture
+            // Check if this device supports video capture and has formats
             int fd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
             if (fd >= 0) {
                 v4l2_capability cap = {};
                 if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
                     // Only add devices that support video capture
                     if (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) {
-                        addCamera("Video Device " + to_string(index), devicePath);
+                        // Also check if the device supports any video formats
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(fd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            // Device has at least one supported format
+                            addCamera("Video Device " + to_string(index), devicePath);
+                        }
                     }
                 }
                 close(fd);
@@ -253,6 +269,37 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
         // If still not found, try to use the input as a direct path
         if (devicePath.empty()) {
             devicePath = deviceName;
+            LOG_LNX("Device not found in camera list, trying direct path: " << devicePath);
+            
+            // If direct path also fails validation, use the first available camera
+            if (access(devicePath.c_str(), F_OK) != 0 || !cameras.empty()) {
+                // Check if the direct path device supports video capture and formats
+                bool directPathValid = false;
+                if (access(devicePath.c_str(), F_OK) == 0) {
+                    int testFd = open(devicePath.c_str(), O_RDWR | O_NONBLOCK);
+                    if (testFd >= 0) {
+                        v4l2_capability cap = {};
+                        v4l2_fmtdesc fmt = {};
+                        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                        fmt.index = 0;
+                        
+                        if (ioctl(testFd, VIDIOC_QUERYCAP, &cap) == 0 &&
+                            (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) &&
+                            ioctl(testFd, VIDIOC_ENUM_FMT, &fmt) == 0) {
+                            directPathValid = true;
+                        }
+                        close(testFd);
+                    }
+                }
+                
+                // If direct path is not valid and we have available cameras, use the first one
+                if (!directPathValid && !cameras.empty()) {
+                    auto firstCamera = cameras.begin();
+                    devicePath = firstCamera->second;
+                    LOG_LNX("Direct path invalid, falling back to first available camera: " 
+                           << firstCamera->first << " -> " << devicePath);
+                }
+            }
         }
     }
 
@@ -322,18 +369,37 @@ void LinuxCapture::StopCapture() {
 }
 
 void LinuxCapture::InitDevice(int width, int height, int fps) {
-    LOG_LNX("Initializing device (will use camera's default resolution)");
+    LOG_LNX("Initializing device (will try to set a reasonable format)");
 
-    // Get the current/default format from the camera
+    // Try to set a reasonable format first, then query what we got
     v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    fmt.fmt.pix.width = 640;
+    fmt.fmt.pix.height = 480;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;  // Most widely supported format
+    fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
 
-    if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
+    LOG_LNX("Trying to set format: YUYV 640x480");
+    if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
         int err = errno;
-        LOG_LNX_ERR("Failed to get current format: " << strerror(err));
-        LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
-        LOG_LNX_ERR("This usually means the device doesn't support video capture or is not a valid V4L2 device");
-        ThrowSystemError("Failed to get current format from device " + deviceName_, err);
+        LOG_LNX_ERR("Failed to set YUYV format: " << strerror(err));
+        
+        // Try MJPEG as fallback
+        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
+        LOG_LNX("Trying fallback format: MJPEG 640x480");
+        if (xioctl(fd_, VIDIOC_S_FMT, &fmt) == -1) {
+            int mjpegErr = errno;
+            LOG_LNX_ERR("Failed to set MJPEG format: " << strerror(mjpegErr));
+            
+            // Final fallback: try to get current format
+            LOG_LNX("Trying to get current format as last resort");
+            if (xioctl(fd_, VIDIOC_G_FMT, &fmt) == -1) {
+                int getFmtErr = errno;
+                LOG_LNX_ERR("Failed to get current format: " << strerror(getFmtErr));
+                LOG_LNX_ERR("Device: " << deviceName_ << " (fd: " << fd_ << ")");
+                ThrowSystemError("Failed to configure any format on device " + deviceName_, getFmtErr);
+            }
+        }
     }
 
     LOG_LNX("Camera's default format: "
