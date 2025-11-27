@@ -10,8 +10,6 @@ module.exports = {
   "coverageReporters": ["lcov", "text-summary"],
   collectCoverageFrom: [
     'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/main.ts',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
