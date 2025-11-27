@@ -30,12 +30,12 @@ jobs:
       - name: Test Coverage
         run: yarn jest
 
-#      - name: Upload coverage to Coveralls
-#        uses: coverallsapp/github-action@v2
-#        with:
-#          github-token: ${{ secrets.GITHUB_TOKEN }}
-#          file: coverage/lcov.info
-#          base-path: .
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage/lcov.info
+          base-path: .
 
       - name: cut
         run: cat coverage/lcov.info
