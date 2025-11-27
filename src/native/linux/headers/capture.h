@@ -19,15 +19,16 @@ public:
     ~LinuxCapture();
 
     void OpenDevice(const std::string& deviceName);
-    void StartCapture(int width, int height, int fps);
+    void StartCapture(int fps);
     void StopCapture();
     FrameData* GetFrame();
     bool IsCapturing() const { return isCapturing_; }
     const std::string& GetDeviceName() const { return deviceName_; }
+    int GetFps() const { return fps_; }
     void SetEnv(Napi::Env env);
     
 private:
-    void InitDevice(int width, int height, int fps);
+    void InitDevice(int fps);
     void UninitDevice();
     void StartStreaming();
     void StopStreaming();

@@ -60,6 +60,43 @@ Required packages:
  - nvm 
  - g++ 
  
+## Architecture Overview
+
+### Video Capture Implementation
+
+Stream Alert uses platform-specific video capture implementations with different architectural models:
+
+#### Linux Implementation (V4L2)
+- **Model**: Pull-based, synchronous frame reading
+- **Key Functions**:
+  - `LinuxCapture::GetFrame()` - Blocks on `select()` until frame ready
+  - `VIDIOC_DQBUF` - Dequeues filled buffer from camera
+  - `VIDIOC_QBUF` - Returns empty buffer to camera
+  - `VIDIOC_S_PARM` - Sets camera framerate via V4L2
+- **Threading**: Custom thread with `sleep_for()` to control FPS
+- **Buffer Management**: Memory-mapped buffers managed by application
+
+#### Win32 Implementation (DirectShow)
+- **Model**: Push-based, asynchronous callback system
+- **Key Functions**:
+  - `SampleGrabberCallback::SampleCB()` - DirectShow calls when frame arrives
+  - `ISampleGrabber::SetCallback()` - Registers callback with DirectShow
+  - `DispatchFrame()` - Applies FPS limiting and calls JavaScript
+- **Threading**: DirectShow manages threads, callbacks run on DirectShow thread
+- **Buffer Management**: DirectShow handles buffer lifecycle
+
+#### Common Flow
+1. **Native Layer**: Platform-specific capture (V4L2/DirectShow)
+2. **N-API Bridge**: Thread-safe callbacks to JavaScript via `Napi::ThreadSafeFunction`
+3. **Stream Service**: Receives frames and calls `frameListener.onNewFrame()`
+4. **App Service**: Processes frames for motion detection and Telegram alerts
+
+### Frame Processing Pipeline
+- **Format Conversion**: YUYV/MJPEG/GREY → RGB24
+- **Motion Detection**: Pixel difference analysis via ImageLib service
+- **Rate Limiting**: FPS control at both native and application levels
+- **Telegram Integration**: Async image upload when motion detected
+
 ## Configuration
 
 Config file is located at `stream-alert.json`, or you can use `src/config/user/[username].json` which is in gitignore.
