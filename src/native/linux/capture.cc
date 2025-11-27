@@ -417,6 +417,24 @@ void LinuxCapture::InitDevice(int fps) {
     LOG_LNX("Setting frame rate to " << fps << "fps");
     if (xioctl(fd_, VIDIOC_S_PARM, &parm) == -1) {
         LOG_LNX_ERR("Failed to set frame rate (continuing anyway): " << strerror(errno));
+    } else {
+        // Verify what framerate was actually set
+        v4l2_streamparm actualParm = {};
+        actualParm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        if (xioctl(fd_, VIDIOC_G_PARM, &actualParm) == 0) {
+            if (actualParm.parm.capture.timeperframe.denominator > 0) {
+                double actualFps = static_cast<double>(actualParm.parm.capture.timeperframe.denominator) / 
+                                 static_cast<double>(actualParm.parm.capture.timeperframe.numerator);
+                LOG_LNX("Camera actual framerate: " << actualFps << "fps (" 
+                        << actualParm.parm.capture.timeperframe.numerator << "/" 
+                        << actualParm.parm.capture.timeperframe.denominator << ")");
+                if (std::abs(actualFps - fps) > 0.1) {
+                    LOG_LNX_ERR("WARNING: Requested " << fps << "fps but camera set to " << actualFps << "fps");
+                }
+            }
+        } else {
+            LOG_LNX_ERR("Failed to verify framerate: " << strerror(errno));
+        }
     }
 
     // Request buffers
@@ -867,7 +885,13 @@ namespace Capture {
                     Capture::g_callbackFunction.BlockingCall(frameCopy, callback);
                     delete frame;
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 30)); // 30 FPS
+                // Use the configured FPS instead of hardcoded 30 FPS
+                int configuredFps = Capture::g_capture->GetFps();
+                if (configuredFps > 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / configuredFps));
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 30)); // fallback to 30 FPS
+                }
             }
         });
 

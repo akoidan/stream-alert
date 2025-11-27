@@ -24,6 +24,7 @@ public:
     FrameData* GetFrame();
     bool IsCapturing() const { return isCapturing_; }
     const std::string& GetDeviceName() const { return deviceName_; }
+    int GetFps() const { return fps_; }
     void SetEnv(Napi::Env env);
     
 private:
