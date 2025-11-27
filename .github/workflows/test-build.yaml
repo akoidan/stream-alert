@@ -35,7 +35,3 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: coverage/lcov.info
-          base-path: .
-
-      - name: cut
-        run: cat coverage/lcov.info
