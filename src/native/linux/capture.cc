@@ -338,7 +338,7 @@ void LinuxCapture::OpenDevice(const string& deviceName) {
     }
 }
 
-void LinuxCapture::StartCapture(int width, int height, int fps) {
+void LinuxCapture::StartCapture(int fps) {
     LOG_LNX("Starting capture (will use camera's preferred resolution) at " << fps << "fps");
 
     if (isCapturing_) {
@@ -349,7 +349,7 @@ void LinuxCapture::StartCapture(int width, int height, int fps) {
     fps_ = fps;
     // width_ and height_ will be set by InitDevice based on camera's actual format
 
-    InitDevice(width, height, fps);
+    InitDevice(fps);
 
     LOG_LNX("Device initialized, starting streaming...");
     StartStreaming();
@@ -367,7 +367,7 @@ void LinuxCapture::StopCapture() {
     UninitDevice();
 }
 
-void LinuxCapture::InitDevice(int width, int height, int fps) {
+void LinuxCapture::InitDevice(int fps) {
     LOG_LNX("Initializing device (using camera's preferred format and resolution)");
 
     // Get the camera's current/default format without trying to change it
@@ -804,7 +804,7 @@ namespace Capture {
             LOG_LNX("Successfully opened device: " << g_capture->GetDeviceName());
 
             // Start capture with camera's preferred resolution
-            g_capture->StartCapture(0, 0, frameRate);
+            g_capture->StartCapture(frameRate);
         } catch (const Napi::Error& error) {
             g_isCapturing = false;
             g_capture.reset();
