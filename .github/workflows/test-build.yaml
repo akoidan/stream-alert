@@ -38,5 +38,4 @@ jobs:
 #          base-path: .
 
       - name: cut
-        uses: coverallsapp/github-action@v2
         run: cat coverage/lcov.info
