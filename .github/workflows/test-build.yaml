@@ -1,0 +1,38 @@
+name: test-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+
+  linux:
+    runs-on: ubuntu-24.04
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          package-manager-cache: false
+          node-version: 24
+
+      - uses: actions/cache@v4
+        id: cache-node
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
+
+      - name: Install yarn deps
+        if: steps.cache-node.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Test Coverage
+        run: yarn jest
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage/lcov.info
+          base-path: .
