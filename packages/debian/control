@@ -1,0 +1,15 @@
+Source: stream-alert
+Section: utils
+Priority: optional
+Maintainer: Andrew Koidan <deathangel908@gmail.com>
+Standards-Version: 4.6.1
+Homepage: https://github.com/deathangel908/stream-alert
+Vcs-Browser: https://github.com/deathangel908/stream-alert
+Vcs-Git: https://github.com/deathangel908/stream-alert.git
+Rules-Requires-Root: no
+Version: UNSET
+Package: stream-alert
+Architecture: amd64
+Depends: libjpeg-turbo8,
+         v4l-utils
+Description: Get a Telegram notification when your webcam or screen changes

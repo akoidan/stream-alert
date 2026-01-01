@@ -1,51 +1,17 @@
-name: build
+name: release
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      release_name:
-        description: 'Release Name'
-        required: true
+  release:
+    types: [published]
 
 jobs:
-  create_release:
-    runs-on: ubuntu-24.04
-
-    permissions: write-all
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Set Short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-      - name: Set Release Name from Input
-        if: github.event_name == 'workflow_dispatch'
-        run: echo "RELEASE_NAME=${{ github.event.inputs.release_name }}" >> $GITHUB_ENV
-
-      - name: Set Release Name for Push Trigger
-        if: github.event_name == 'push'
-        run: echo "RELEASE_NAME=${{ env.SHORT_SHA }}" >> $GITHUB_ENV
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ env.RELEASE_NAME }}
-          release_name: ${{ env.RELEASE_NAME }}
-          draft: false
-          prerelease: false
-
   linux:
-    runs-on: ubuntu-24.04
-    needs: [ create_release ]
+    runs-on: ubuntu-22.04
     permissions: write-all
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies # TODO cache
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libv4l-dev
@@ -54,9 +20,10 @@ jobs:
         with:
           package-manager-cache: false
           node-version: 24
-
-      - uses: actions/cache@v4
+      - name: Restore node_modules cache
         id: cache-node
+        # DO not create cache on release, only on master
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
@@ -82,37 +49,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./dist/stream-alert.exe
           asset_name: stream-alert.elf
           asset_content_type: application/x-executable
-      - name: Test Coverage
-        run: yarn jest
-
-      - name: Upload coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: coverage/lcov.info
 
   win32:
-    needs: [ create_release ]
     runs-on: windows-2022
     permissions: write-all
     steps:
       - uses: actions/checkout@v3
-
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v3
         with:
-          package-manager-cache: false
-          node-version: 24
-
-      - uses: actions/cache@v4
+          node-version: 18
+      - name: Restore node_modules cache
         id: cache-node
+        # DO not create cache on release, only on master
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('yarn.lock') }}
-
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
@@ -134,7 +90,71 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./dist/stream-alert.exe
           asset_name: stream-alert.exe
           asset_content_type: application/vnd.microsoft.portable-executable
+
+  aur:
+    needs: [linux]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy PKGBUILD and related files
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          VERSION=$(jq -r '.version' package.json)
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" ./packages/arch/PKGBUILD
+          sed -i "s/^tag=.*/tag=${TAG}/" ./packages/arch/PKGBUILD
+
+      - name: Publish to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: stream-alert
+          pkgbuild: ./packages/arch/PKGBUILD
+          assets: |
+            ./packages/arch/stream-alert.install
+            ./packages/stream-alert.service
+          commit_username: "GitHub Actions Bot"
+          updpkgsums: "true"
+          commit_email: "actions@github.com"
+          ssh_private_key: ${{ secrets.PK_ARCH }}
+
+  deb:
+    runs-on: ubuntu-22.04
+    needs: [linux]
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+      - name: Prepare package
+        env:
+          DEBEMAIL: "deathangel908@gmail.com"
+          DEBFULLNAME: "Andrew Koidan"
+        run: |
+          url="https://github.com/akoidan/stream-alert"
+          tag="${{ github.event.release.tag_name }}"
+          wget -q "${url}/releases/download/${tag}/stream-alert.elf"
+          wget -q "${url}/releases/download/${tag}/swagger.json"
+          VERSION=$(jq -r '.version' ./package.json)
+          rootdir=$(pwd)
+          srcdir="${rootdir}/packages/debian"
+          pkgdir="${srcdir}/stream-alert"
+          sed -i "s/^Version:.*/Version: ${VERSION}/" "${srcdir}/control"
+          install -D -m 644 "${srcdir}/control" "${pkgdir}/DEBIAN/control"
+          install -D -m 755 "${rootdir}/stream-alert.elf" "${pkgdir}/usr/bin/stream-alert"
+          install -D -m 644 "${rootdir}/packages/stream-alert.service" "${pkgdir}/usr/lib/systemd/user/stream-alert.service"
+          cd "$srcdir"
+          dpkg-deb --build stream-alert stream-alert-amd64.deb
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: packages/debian/stream-alert-amd64.deb
+          asset_name: stream-alert.deb
+          asset_content_type: application/vnd.debian.binary-package

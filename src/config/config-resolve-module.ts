@@ -14,6 +14,9 @@ import {NativeModule} from '@/native/native-module';
 import {Telegraf} from 'telegraf';
 import {FileConfigReader} from '@/config/file-config-reader.service';
 import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-zod-schema';
+import process from "node:process";
+import path from "path";
+import yargs from "yargs";
 
 
 @Module({
@@ -33,7 +36,21 @@ import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-
     },
     {
       provide: ConfigPath,
-      useValue: isSea() ? __dirname : process.cwd(),
+      useFactory: async(): Promise<string> => {
+        const res = isSea() ? __dirname : process.cwd();
+        const {config} = await yargs(process.argv.slice(2))
+          .strict()
+          .scriptName('stream-alert')
+          .epilog('Refer https://github.com/akoidan/stream-alert for more documentation')
+          .usage('Get a Telegram notification when your webcam or screen changes\n')
+          .option('config', {
+            type: 'string',
+            default: path.join(res, 'stream-alert.jsonc'),
+            description: 'Nain config file',
+          })
+          .parse();
+        return config;
+      }
     },
     {
       provide: ConfigData,
