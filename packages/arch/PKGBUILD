@@ -15,8 +15,8 @@ depends=(
 install=stream-alert.install
 source=(
   "stream-alert::${url}/releases/download/${tag}/stream-alert.elf"
-  "hotkey-hub.service"
-  "hotkey-hub.install"
+  "stream-alert.service"
+  "stream-alert.install"
 )
 options=(!strip)
 sha256sums=(
@@ -27,5 +27,5 @@ sha256sums=(
 
 package() {
   install -D -m755 "${srcdir}/stream-alert" "${pkgdir}/usr/bin/stream-alert"
-  install -D -m644 "${srcdir}/stream-alert.service" "${pkgdir}/usr/lib/systemd/user/hotkey-hub.service"
+  install -D -m644 "${srcdir}/stream-alert.service" "${pkgdir}/usr/lib/systemd/user/stream-alert.service"
 }
