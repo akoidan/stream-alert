@@ -11,22 +11,27 @@ export class FileConfigReader {
   constructor(
     protected readonly logger: Logger,
     @Inject(ConfigPath)
-    protected readonly configsPath: string
+    protected readonly confPath: string
   ) {
   }
 
-  protected get confPath(): string {
-    return path.join(this.configsPath, 'stream-alert.json');
-  };
-
 
   public async canHandle(): Promise<boolean> {
-    return fs.access(this.confPath).then(() => true).catch(() => false);
+    return fs.access(this.confPath).then(() => true).catch(() => {
+      this.logger.error(`Cannot load main configuration file: ${this.confPath}`);
+      return false;
+    });
   }
 
   public async save(data: Config): Promise<void> {
     this.data = data;
     this.logger.log(`Saving data to file ${this.confPath}`);
+    const dir = path.dirname(this.confPath);
+    try {
+      await fs.mkdir(dir, {recursive: true});
+    } catch (error: any) {
+      throw Error(`Failed to create directory ${dir}: ${error?.message || error}`);
+    }
     await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
   }
 
