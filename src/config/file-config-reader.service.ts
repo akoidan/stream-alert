@@ -1,5 +1,6 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {promises as fs} from 'fs';
+import path from 'path';
 import {aconfigSchema, Config} from '@/config/config-zod-schema';
 import {ConfigPath} from '@/config/config-resolve-model';
 
@@ -25,6 +26,12 @@ export class FileConfigReader {
   public async save(data: Config): Promise<void> {
     this.data = data;
     this.logger.log(`Saving data to file ${this.confPath}`);
+    const dir = path.dirname(this.confPath);
+    try {
+      await fs.mkdir(dir, { recursive: true }).catch(e => {throw Error(`Failed to create directory ${dir}`)});
+    } catch (error) {
+      throw Error(`Failed to create directory ${dir}: ${error}`)
+    }
     await fs.writeFile(this.confPath, JSON.stringify(this.data, null, 2));
   }
 
