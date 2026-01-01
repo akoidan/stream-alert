@@ -21,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.cache-node.outputs.cache-hit != 'true'
         with:
+          package-manager-cache: false
           node-version: 24
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
@@ -50,7 +51,8 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.cache-node.outputs.cache-hit != 'true'
         with:
-          node-version: 14
+          package-manager-cache: false
+          node-version: 24
       - name: Install yarn deps
         if: steps.cache-node.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
