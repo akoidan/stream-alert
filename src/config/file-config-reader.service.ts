@@ -28,7 +28,7 @@ export class FileConfigReader {
     this.logger.log(`Saving data to file ${this.confPath}`);
     const dir = path.dirname(this.confPath);
     try {
-      await fs.mkdir(dir, { recursive: true }).catch(e => {throw Error(`Failed to create directory ${dir}`)});
+      await fs.mkdir(dir, { recursive: true });
     } catch (error) {
       throw Error(`Failed to create directory ${dir}: ${error}`)
     }
