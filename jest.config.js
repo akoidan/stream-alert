@@ -6,6 +6,9 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!(yargs)/)'
+  ],
   "collectCoverage": true,
   "coverageReporters": ["lcov", "text-summary"],
   collectCoverageFrom: [

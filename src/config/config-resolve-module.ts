@@ -14,9 +14,9 @@ import {NativeModule} from '@/native/native-module';
 import {Telegraf} from 'telegraf';
 import {FileConfigReader} from '@/config/file-config-reader.service';
 import {CameraConfig, Config, DiffConfig, TelegramConfig} from '@/config/config-zod-schema';
-import process from "node:process";
-import path from "path";
-import yargs from "yargs";
+import process from 'node:process';
+import path from 'path';
+import yargs from 'yargs';
 
 
 @Module({
@@ -50,7 +50,7 @@ import yargs from "yargs";
           })
           .parse();
         return config;
-      }
+      },
     },
     {
       provide: ConfigData,

@@ -1,9 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from '../src/app/app-module';
-import { AppService } from '../src/app/app-service';
-import { Telegraf } from 'telegraf';
-import { Native, INativeModule } from '../src/native/native-model';
-import prompts from 'prompts';
+import {Test, TestingModule} from '@nestjs/testing';
+import {AppModule} from '../src/app/app-module';
+import {INativeModule, Native} from '../src/native/native-model';
+import {ConfigPath} from "../src/config/config-resolve-model";
 
 // Mock Telegraf class
 jest.mock('telegraf', () => {
@@ -90,6 +88,8 @@ describe('AppModule Functional Test', () => {
     })
       .overrideProvider(Native)
       .useValue(mockNativeModule)
+      .overrideProvider(ConfigPath)
+      .useValue('stream-alert.jsonc')
       .compile();
 
     appModule = app.get<AppModule>(AppModule);

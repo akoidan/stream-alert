@@ -1,6 +1,5 @@
 import {Inject, Injectable, Logger} from '@nestjs/common';
 import {promises as fs} from 'fs';
-import path from 'path';
 import {aconfigSchema, Config} from '@/config/config-zod-schema';
 import {ConfigPath} from '@/config/config-resolve-model';
 
@@ -18,7 +17,7 @@ export class FileConfigReader {
 
   public async canHandle(): Promise<boolean> {
     return fs.access(this.confPath).then(() => true).catch(() => {
-      this.logger.error(`Cannot load main configuration file: ${this.confPath}`)
+      this.logger.error(`Cannot load main configuration file: ${this.confPath}`);
       return false;
     });
   }
